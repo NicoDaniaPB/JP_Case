@@ -65,16 +65,70 @@ sub_cancel <- sub_cancel %>%
     )
   )
 
+
 # Vi ser fordelingen
 sub_cancel %>% count(length_group)
 
+
+# Vi tilføjer alder som variabel 
 sub_cancel <- sub_cancel %>%
   mutate(
-    age = time_length(interval(birthdate, today()), "years")
+    age = floor(time_length(interval(birthdate, today()), "years"))
   )
 
+# Vi beregner gennemsnitsalderen for de forskellige intervaller
+sub_cancel %>%
+  group_by(length_group) %>%
+  summarise(
+    mean_age = mean(age, na.rm = TRUE),
+    median_age = median(age, na.rm = TRUE),
+    n = n()
+  )
+
+# Vi laver et boxplot og aldersfordeling pr. abonnementslængnde
+sub_cancel %>%
+  ggplot(aes(x = length_group, y = age)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.6) +
+  labs(
+    title = "Aldersfordeling pr. abonnementslængde",
+    x = "Abonnementslængde",
+    y = "Alder"
+  ) +
+  theme_minimal()
+
+# Vi laver nogle forskellige demografiske grupper 
+sub_cancel <- sub_cancel %>%
+  mutate(
+    age_group = case_when(
+      age < 25 ~ "18–24",
+      age < 35 ~ "25–34",
+      age < 45 ~ "35–44",
+      age < 55 ~ "45–54",
+      age < 65 ~ "55–64",
+      TRUE ~ "65+"
+    )
+  )
+
+# Vi ser fordelingen af aldersgrupper indenfor abonnementslængden
+sub_cancel %>%
+  count(length_group, age_group) %>%
+  group_by(length_group) %>%
+  mutate(pct = n / sum(n) * 100)
 
 view(sub_cancel)
+
+# Vi laver et stacked bar chat
+sub_cancel %>%
+  ggplot(aes(x = length_group, fill = age_group)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Aldersgrupper fordelt på abonnementslængde",
+    x = "Abonnementslængde",
+    y = "Andel",
+    fill = "Aldersgruppe"
+  ) +
+  theme_minimal()
 
 
 
