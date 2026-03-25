@@ -49,7 +49,7 @@ sub_cancel <- sub_cancel %>%
       Sys.Date(),
       subscription_cancel_date
     ),
-    subscription_length_days = as.numeric(end_date - as.Date(order_date))
+    subscription_length_days = as.numeric(subscription_cancel_date - as.Date(order_date))
   )
 
 # Vi laver grupper baseret på abonnementslængder
@@ -75,6 +75,8 @@ sub_cancel <- sub_cancel %>%
   mutate(
     age = floor(time_length(interval(birthdate, today()), "years"))
   )
+
+# Her renser vi ud
 
 # Vi beregner gennemsnitsalderen for de forskellige intervaller
 sub_cancel %>%
