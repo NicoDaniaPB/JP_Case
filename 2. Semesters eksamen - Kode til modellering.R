@@ -1,4 +1,4 @@
-pacman::p_load(tidyverse, readr)
+pacman::p_load(tidyverse, readr, ggplot2)
 
 # Vi indlæser dataene
 behavior <- read_csv("data/behavior.csv")
@@ -73,6 +73,33 @@ sub_cancel <- sub_cancel %>%
     age = time_length(interval(birthdate, today()), "years")
   )
 
+sub_cancel %>%
+  filter(subscription_length_days <= 1000) %>%
+  ggplot(aes(x = subscription_length_days)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
+labs(
+  title = "Fordeling af abonnementslængde",
+  x = "Dage",
+  y = "Antal"
+)
+
+sub_cancel %>%
+  ggplot(aes(x = age)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
+  labs(
+    title = "Fordeling af abonnementslængde",
+    x = "alder",
+    y = "Antal"
+  )
+
+ggplot(sub_cancel, aes(x = type)) +
+  geom_bar(fill = "steelblue") +
+  labs(
+    title = "Fordeling af opsigelsesgrunde",
+    x = "Grund (type)",
+    y = "Antal"
+  ) +
+  theme_minimal()
 
 view(sub_cancel)
 
