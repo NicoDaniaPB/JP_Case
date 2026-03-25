@@ -68,11 +68,17 @@ sub_cancel <- sub_cancel %>%
 # Vi ser fordelingen
 sub_cancel %>% count(length_group)
 
+# Rensning
 sub_cancel <- sub_cancel %>%
-  mutate(
-    age = time_length(interval(birthdate, today()), "years")
-  )
+  mutate(age = time_length(interval(birthdate, today()), "years")) %>%
+  filter(!is.na(koen)) %>%
+  filter(age >= 10 & age <= 120) %>%
+  filter(subscription_length_days <= 365) # Her har vi kun fået information de sidste
 
+view(sub_cancel)
+
+
+# Intern visualisering
 sub_cancel %>%
   filter(subscription_length_days <= 1000) %>%
   ggplot(aes(x = subscription_length_days)) +
@@ -84,7 +90,7 @@ labs(
 )
 
 sub_cancel %>%
-  ggplot(aes(x = age)) +
+  ggplot(aes(x = age, fill = koen)) +
   geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
   labs(
     title = "Fordeling af abonnementslængde",
@@ -93,7 +99,7 @@ sub_cancel %>%
   )
 
 ggplot(sub_cancel, aes(x = type)) +
-  geom_bar(fill = "steelblue") +
+  geom_bar(fill = "steelblue", color = "white") +
   labs(
     title = "Fordeling af opsigelsesgrunde",
     x = "Begundelse (type)",
@@ -101,7 +107,6 @@ ggplot(sub_cancel, aes(x = type)) +
   ) +
   theme_minimal()
 
-view(sub_cancel)
 
 
 
