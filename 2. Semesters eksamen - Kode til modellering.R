@@ -130,6 +130,26 @@ sub_cancel %>%
   ) +
   theme_minimal()
 
+# Vi ser fordelingen af køn
+sub_cancel %>%
+count(length_group, koen) %>%
+  group_by(length_group) %>%
+  mutate(pct = n / sum(n) * 100)
+
+# Vi laver et stacked bar chart
+sub_cancel %>%
+  ggplot(aes(x = length_group, fill = koen)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Kønsfordeling på tværs af abonnementslængder",
+    x = "Abonnementslængde",
+    y = "Andel",
+    fill = "Køn"
+  ) +
+  theme_minimal()
+
+
 
 
 
