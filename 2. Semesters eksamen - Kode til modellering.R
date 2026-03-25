@@ -96,7 +96,7 @@ ggplot(sub_cancel, aes(x = type)) +
   geom_bar(fill = "steelblue") +
   labs(
     title = "Fordeling af opsigelsesgrunde",
-    x = "Grund (type)",
+    x = "Begundelse (type)",
     y = "Antal"
   ) +
   theme_minimal()
