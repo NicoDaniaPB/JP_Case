@@ -5,6 +5,7 @@ behavior <- read_csv("data/behavior.csv")
 cancellation <- read_csv("data/cancellation.csv")
 subscription <- read_csv("data/subscription.csv")
 
+
 glimpse(behavior)
 glimpse(cancellation)
 glimpse(subscription)
@@ -67,4 +68,14 @@ sub_cancel <- sub_cancel %>%
 # Vi ser fordelingen
 sub_cancel %>% count(length_group)
 
+sub_cancel <- sub_cancel %>%
+  mutate(
+    age = time_length(interval(birthdate, today()), "years")
+  )
+
+
 view(sub_cancel)
+
+
+
+
