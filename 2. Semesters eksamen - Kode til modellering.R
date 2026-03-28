@@ -51,7 +51,7 @@ sub_cancel <- sub_cancel %>%
       Sys.Date(),
       subscription_cancel_date
     ),
-    subscription_length_days = as.numeric(end_date - as.Date(order_date))
+    subscription_length_days = as.numeric(subscription_cancel_date - as.Date(order_date))
   )
 
 
@@ -80,6 +80,38 @@ sub_cancel <- sub_cancel %>%
 # Vi beregner alder ud fra fødselsdato, og kategoriser dem i breddere grupper.
 # Dette skal bruges til churn-analyse, segmentering og ML-modellerne. 
 
+<<<<<<< HEAD
+=======
+# Vi tilføjer alder som variabel 
+sub_cancel <- sub_cancel %>%
+  mutate(
+    age = floor(time_length(interval(birthdate, today()), "years"))
+  )
+
+# Her renser vi ud
+
+# Vi beregner gennemsnitsalderen for de forskellige intervaller
+sub_cancel %>%
+  group_by(length_group) %>%
+  summarise(
+    mean_age = mean(age, na.rm = TRUE),
+    median_age = median(age, na.rm = TRUE),
+    n = n()
+  )
+
+# Vi laver et boxplot og aldersfordeling pr. abonnementslængnde
+sub_cancel %>%
+  ggplot(aes(x = length_group, y = age)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.6) +
+  labs(
+    title = "Aldersfordeling pr. abonnementslængde",
+    x = "Abonnementslængde",
+    y = "Alder"
+  ) +
+  theme_minimal()
+
+# Vi laver nogle forskellige demografiske grupper 
+>>>>>>> 8dab2b844a78cd3e270001d1d87f5b67678acbc7
 sub_cancel <- sub_cancel %>%
   mutate(
     age = floor(time_length(interval(birthdate, today()), "years")),
