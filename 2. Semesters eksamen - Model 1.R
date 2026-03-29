@@ -1,9 +1,13 @@
-pacman::p_load(tidyverse, lubridate, caret, pROC)
+pacman::p_load(tidyverse, lubridate, caret, randomForest, xgboost, pROC)
 
 # Vi har nu loaded de pakker vi skal bruge. Vi bruger tidyverse til 
 # datamanipulation. lubridate bruges til at håndterer datoer. caret bruges til 
 # train/test split og modelværktøjer. pROC bruges til ROC-kurver og cutoffs i 
-# vores klassifikationsmodeller. 
+# vores klassifikationsmodeller. randomForest- og xgboost- pakkerne bruges til
+# at køre RF og boosting modellerne. 
+
+# Vores første model skal kunne klassificere, om kunden forsætter efter
+# kampagneperioden, eller om de churner. 
 
 # 1. Indlæsning af data -------------------------------------------------------
 model_data <- read_rds("data/renset_datasæt.rds")
@@ -165,7 +169,7 @@ dtest  <- xgb.DMatrix(data = test_matrix,  label = test_label)
 # Vi sikrer reproducerbarhed
 set.seed(47)
 
-# Vi træner vores XGBoost
+# Vi træner vores XGBoost-model
 xgb_model <- xgb.train(
   data = dtrain,
   nrounds = 300,
