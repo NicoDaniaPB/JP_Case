@@ -80,8 +80,6 @@ sub_cancel <- sub_cancel %>%
 # Vi beregner alder ud fra fødselsdato, og kategoriser dem i breddere grupper.
 # Dette skal bruges til churn-analyse, segmentering og ML-modellerne. 
 
-<<<<<<< HEAD
-=======
 # Vi tilføjer alder som variabel 
 sub_cancel <- sub_cancel %>%
   mutate(
