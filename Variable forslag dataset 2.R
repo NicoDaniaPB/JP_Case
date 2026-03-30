@@ -70,3 +70,8 @@ behavior_agg <- behavior %>%
     
     .groups = "drop"
   )
+
+
+write_csv(behavior_agg, "data/datasæt 2 - konstruerede variabler.csv")
+
+
