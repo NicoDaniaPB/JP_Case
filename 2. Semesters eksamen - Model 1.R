@@ -195,7 +195,91 @@ xgb_pred <- ifelse(xgb_prob > cut_xgb, "1", "0") %>% factor(levels = c("0","1"))
 cm_xgb <- confusionMatrix(xgb_pred, test_data$continued_after_campaign)
 cm_xgb
 
-# 9. Konklusion til ML-model nr. 1 --------------------------------------------
+# 9. AUC-sammenligning -------------------------------------------------------
+
+auc_log <- as.numeric(pROC::auc(roc_log))
+auc_rf  <- as.numeric(pROC::auc(roc_rf))
+auc_xgb <- as.numeric(pROC::auc(roc_xgb))
+
+model_sammenligning <- tibble(
+  Model       = c("Logistisk regression", "Random Forest", "XGBoost"),
+  AUC         = round(c(auc_log, auc_rf, auc_xgb), 4),
+  Accuracy    = round(c(
+    cm_log$overall["Accuracy"],
+    cm_rf$overall["Accuracy"],
+    cm_xgb$overall["Accuracy"]
+  ), 4),
+  Sensitivity = round(c(
+    cm_log$byClass["Sensitivity"],
+    cm_rf$byClass["Sensitivity"],
+    cm_xgb$byClass["Sensitivity"]
+  ), 4),
+  Specificity = round(c(
+    cm_log$byClass["Specificity"],
+    cm_rf$byClass["Specificity"],
+    cm_xgb$byClass["Specificity"]
+  ), 4)
+)
+
+print(model_sammenligning)
+
+plot(roc_log, col = "steelblue", lwd = 2,
+     main = "ROC-kurver — Model 1 (churn ved kampagneslut)")
+plot(roc_rf,  col = "darkgreen", lwd = 2, add = TRUE)
+plot(roc_xgb, col = "firebrick", lwd = 2, add = TRUE)
+legend("bottomright",
+       legend = c(
+         paste0("Logistisk regression (AUC = ", round(auc_log, 3), ")"),
+         paste0("Random Forest        (AUC = ", round(auc_rf,  3), ")"),
+         paste0("XGBoost              (AUC = ", round(auc_xgb, 3), ")")
+       ),
+       col = c("steelblue", "darkgreen", "firebrick"),
+       lwd = 2)
+
+# 10. Variabelvigtighed -------------------------------------------------------
+
+# Random Forest: built-in importance
+# MeanDecreaseGini måler hvor meget hver variabel bidrager til
+# at reducere usikkerhed på tværs af alle træer i skoven
+rf_imp <- importance(rf_model) %>%
+  as.data.frame() %>%
+  rownames_to_column("variabel") %>%
+  arrange(desc(MeanDecreaseGini))
+
+# Vi plotter de 15 vigtigste variabler
+rf_imp %>%
+  slice_head(n = 15) %>%
+  ggplot(aes(x = reorder(variabel, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_col(fill = "darkgreen", alpha = 0.8) +
+  coord_flip() +
+  labs(
+    title = "Variabelvigtighed — Random Forest (Model 1)",
+    subtitle = "MeanDecreaseGini: hvor meget variablen reducerer usikkerhed på tværs af træer",
+    x = NULL,
+    y = "MeanDecreaseGini"
+  ) +
+  theme_minimal()
+
+# XGBoost: feature importance
+xgb_imp <- xgb.importance(model = xgb_model) %>%
+  as_tibble()
+
+# Vi plotter de 15 vigtigste variabler
+xgb_imp %>%
+  slice_head(n = 15) %>%
+  ggplot(aes(x = reorder(Feature, Gain), y = Gain)) +
+  geom_col(fill = "firebrick", alpha = 0.8) +
+  coord_flip() +
+  labs(
+    title = "Variabelvigtighed — XGBoost (Model 1)",
+    subtitle = "Gain: hvor meget hver variabel forbedrer modellens præcision",
+    x = NULL,
+    y = "Gain"
+  ) +
+  theme_minimal()
+
+
+# 11. Konklusion til ML-model nr. 1 --------------------------------------------
 
 # Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
 # fortsætter efter kampagneperioden. Vi har brugt korrekt feature engineering og
@@ -203,4 +287,14 @@ cm_xgb
 # Modellen identificerer 80% af churnerne og 75% af de kunder, der fortsætter, 
 # hvilket gør den velegnet til at understøtte JPs problemstillinger. 
 
+# 11. Konklusion til ML-model nr. 1 NØGLETAL ------------------------------------------
 
+# Vi udprinter en samlet konklusion baseret på de faktiske modelresultater
+cat("=== MODEL 1 KONKLUSION ===\n")
+cat("Bedste model (AUC):", model_sammenligning$Model[which.max(model_sammenligning$AUC)], "\n")
+cat("AUC:        ", max(model_sammenligning$AUC), "\n")
+cat("Accuracy:   ", model_sammenligning$Accuracy[which.max(model_sammenligning$AUC)], "\n")
+cat("Sensitivity:", model_sammenligning$Sensitivity[which.max(model_sammenligning$AUC)], "\n")
+cat("Specificity:", model_sammenligning$Specificity[which.max(model_sammenligning$AUC)], "\n")
+cat("\nModellerne er rangeret efter AUC fremfor accuracy, da churn-data\n")
+cat("er class-imbalanced. AUC måler skelneevnen uafhængigt af klassefordeling.\n")
