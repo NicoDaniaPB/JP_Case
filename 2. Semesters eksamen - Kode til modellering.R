@@ -1,26 +1,56 @@
-pacman::p_load(tidyverse, lubridate, readr)
+acman::p_load(tidyverse, lubridate, readr)
 
 # 1. Indlæsning af data -------------------------------------------------------
 
-# Vi indlæser de tre datasæt via read_csv-funktionen.
-
 behavior <- read_csv("data/behavior.csv")
 cancellation <- read_csv("data/cancellation.csv")
-subscription <- read_csv("data/subscription.csv")
+subscription2 <- read_csv("data/subscription_v2.csv")
 
-# Behavior beskriver kundernes digitale adfærd.
-# Cancellation beskriver opsigelser og årsagerne hertil.
+
+# 1B. Split og parse subscription2 -------------------------------------------
+
+subscription2_clean <- subscription2 %>%
+  separate(
+    col = 1,
+    into = c(
+      "pseudo_id", "account_active_days", "subscription_cancel_date",
+      "order_date", "koen", "birthdate", "usr_created", "order_trackertag",
+      "permission_given_order", "permission_given_today",
+      "previous_subscriptions", "previous_campaigns", "previous_trials",
+      "first_campaign_day", "last_campaign_day",
+      "newsletters_before_order", "newsletters_after_order"
+    ),
+    sep = ";",
+    convert = FALSE
+  ) %>%
+  mutate(
+    # Datoer i dd-mm-yyyy format
+    subscription_cancel_date = dmy(subscription_cancel_date),
+    birthdate = dmy(birthdate),
+    usr_created = dmy(usr_created),
+    first_campaign_day = dmy(first_campaign_day),
+    last_campaign_day = dmy(last_campaign_day),
+
+    # order_date er datetime
+    order_date = ymd_hms(order_date),
+
+    # Tal
+    account_active_days = as.numeric(account_active_days),
+    previous_subscriptions = as.numeric(previous_subscriptions),
+    previous_campaigns = as.numeric(previous_campaigns),
+    previous_trials = as.numeric(previous_trials),
+    newsletters_before_order = as.numeric(newsletters_before_order),
+    newsletters_after_order = as.numeric(newsletters_after_order),
+
+    # Logiske værdier
+    permission_given_order = as.logical(permission_given_order),
+    permission_given_today = as.logical(permission_given_today)
+  )
 
 
 # 2. Fjern dubletter ---------------------------------------------------------
 
-# Vi fjerner dubeletter i datasættet, da det kan give problemer i vores 
-# data-analyse. Det kan give problemer som dobbelt tælling af churn, forkerte 
-# churb-targets, overfitting i modellerne eler skæve segmenter i klyngeanalysen.
-# Vi vælger derfor den nyeste ordre pr. kunde, og den seneste opsigelse 
-# pr. kunde.
-
-subscription_renset <- subscription %>%
+subscription_renset <- subscription2_clean %>%
   group_by(pseudo_id) %>%
   slice_max(order_date) %>%
   ungroup()
@@ -31,18 +61,13 @@ cancellation_renset <- cancellation %>%
   ungroup()
 
 
-# 3. Merge subscription + cancellation ---------------------------------------
-
-# Vi kombinerer de to rensede datasæt, så vi har et samlet datasæt pr. kunde. 
+# 3. Merge subscription2 + cancellation ---------------------------------------
 
 sub_cancel <- subscription_renset %>%
   left_join(cancellation_renset, by = "pseudo_id")
 
 
 # 4. Beregning af abonnementslængde -------------------------------------------
-
-# Vi laver intervaller for abonnementslængden for kunderne. Dette er et 
-# fundament for churn-analysen og segmenteringen. 
 
 sub_cancel <- sub_cancel %>%
   mutate(
@@ -51,15 +76,11 @@ sub_cancel <- sub_cancel %>%
       Sys.Date(),
       subscription_cancel_date
     ),
-    subscription_length_days = as.numeric(subscription_cancel_date - as.Date(order_date))
+    subscription_length_days = as.numeric(end_date - as.Date(order_date))
   )
 
 
 # 5. Lav churn-grupper -------------------------------------------------------
-
-# Vi opdeler kunder i kategorier som baseres på, hvor langt tid deres 
-# abonnement har aktiv. Dette skal bruges til segmentering og visalusiering, 
-# samt forståelse af churn-mønstre. 
 
 sub_cancel <- sub_cancel %>%
   mutate(
@@ -76,40 +97,6 @@ sub_cancel <- sub_cancel %>%
 
 # 6. Tilføj alder + aldersgrupper -------------------------------------------
 
-# Vi tilføjer to nye variabler: alder og aldersgrupper.
-# Vi beregner alder ud fra fødselsdato, og kategoriser dem i breddere grupper.
-# Dette skal bruges til churn-analyse, segmentering og ML-modellerne. 
-
-# Vi tilføjer alder som variabel 
-sub_cancel <- sub_cancel %>%
-  mutate(
-    age = floor(time_length(interval(birthdate, today()), "years"))
-  )
-
-# Her renser vi ud
-
-# Vi beregner gennemsnitsalderen for de forskellige intervaller
-sub_cancel %>%
-  group_by(length_group) %>%
-  summarise(
-    mean_age = mean(age, na.rm = TRUE),
-    median_age = median(age, na.rm = TRUE),
-    n = n()
-  )
-
-# Vi laver et boxplot og aldersfordeling pr. abonnementslængnde
-sub_cancel %>%
-  ggplot(aes(x = length_group, y = age)) +
-  geom_boxplot(fill = "steelblue", alpha = 0.6) +
-  labs(
-    title = "Aldersfordeling pr. abonnementslængde",
-    x = "Abonnementslængde",
-    y = "Alder"
-  ) +
-  theme_minimal()
-
-# Vi laver nogle forskellige demografiske grupper 
->>>>>>> 8dab2b844a78cd3e270001d1d87f5b67678acbc7
 sub_cancel <- sub_cancel %>%
   mutate(
     age = floor(time_length(interval(birthdate, today()), "years")),
@@ -123,46 +110,21 @@ sub_cancel <- sub_cancel %>%
     )
   )
 
+
 # 7. Lav churn-variabler til modeller ----------------------------------------
 
-# Vi laver churn-variabler, som vi skal bruge senere til ML-modellerne.
-
-# Første ML-target ser ud som følgende: 
-# Hvis kunden stadig er aktiv eller opsiger efter efter kampagnen -> 1
-# Hvis kunden opsiger inden kampagnen slutter -> 0
-
-# Model 1: Churn ved kampagneslut
 sub_cancel <- sub_cancel %>%
   mutate(
     continued_after_campaign = if_else(
       is.na(subscription_cancel_date) |
         subscription_cancel_date > last_campaign_day,
       1, 0
-    )
-  )
-
-# Vores andet ML-target skal tjek til hurtig churn (< 90). 
-# Hvis skunden chruner inden for 90 dage -> 1
-# Ellers er den -> 0
-
-# Model 2: Hurtig churn (< 90 dage)
-sub_cancel <- sub_cancel %>%
-  mutate(
+    ),
     fast_churn = if_else(subscription_length_days < 90, 1, 0)
   )
 
 
 # 8. Aggreger behavior-data --------------------------------------------------
-
-# Vi reducerer behavior-dataene til en række pr. kunde ved at beregne: 
-# antal besøg
-# antal unikke sider
-# antal artikler bag login
-# hvor stor en andel af siderne var restricted
-# gennemsnitlig scroll‑dybde
-# device‑fordeling
-
-# Dette er værdiefulde features til vores churn-modeller. 
 
 behavior_features <- behavior %>%
   group_by(pseudo_id) %>%
@@ -176,13 +138,10 @@ behavior_features <- behavior %>%
     desktop_ratio = mean(dvce_type == "Computer")
   )
 
-# Vi merger behavior ind i datasættet
 full_data <- sub_cancel %>%
   left_join(behavior_features, by = "pseudo_id")
 
 
 # 9. Gem det rensede datasæt -------------------------------------------------
 
-# Vi gemmer modellen som RDS-fil, så vi kan bruge den til modelleringskoden
 saveRDS(full_data, "data/renset_datasæt.rds")
-
