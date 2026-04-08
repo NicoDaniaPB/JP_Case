@@ -45,6 +45,9 @@ cluster_vars <- cluster_vars_raw %>%
   mutate(across(-pseudo_id, ~ if (is.numeric(.x)) .x else as.factor(.x)))
 
 # 6. Beregning af Gower distance ------------------------------------------
+# Vi anvender Gower Distance fordi vi har mixed data. Euklidisk distance som 
+# bruges ved PCA, kan kun anvendes til numeriske data. Derfor bruger vi Gower 
+# Distance, og fravælger at køre PCA. 
 gower_dist <- daisy(cluster_vars %>% select(-pseudo_id), metric = "gower")
 
 # 7. Hierarkisk clustering -------------------------------------------------
@@ -53,13 +56,18 @@ plot(hc, main = "Hierarkisk clustering – kundetyper")
 rect.hclust(hc, k = 4, border = "red")
 
 # 8. Tilføjelse af klynger ------------------------------------------------
+
+# Vi vælger 4 klynger, fordi dendrogrammet viser et naturligt skæringspunkt her, 
+# og fordi fire segmenter giver den mest meningsfulde og forretningsrelevante
+# opdeling af abonnenterne.
 k <- 4
 cluster_vars <- cluster_vars %>% 
   mutate(cluster = factor(cutree(hc, k = k)))
 
-# Join tilbage til model_data
+# Join tilbage til model_data (uden many-to-many advarsel)
 model_data <- model_data %>% 
-  left_join(cluster_vars %>% select(pseudo_id, cluster), by = "pseudo_id")
+  left_join(cluster_vars %>% select(pseudo_id, cluster) %>% distinct(), 
+            by = "pseudo_id")
 
 # 9. Fjern NA-klyngen -----------------------------------------------------
 model_data_clean <- model_data %>% 
@@ -75,6 +83,28 @@ cluster_profile <- model_data_clean %>%
   )
 
 glimpse(cluster_profile)
+
+# 11. Visualisering af klynger --------------------------------------------
+
+# Vi bruger MDS, fordi det er den korrekte metode til at visualisere 
+# Gower‑distance ved mixed data, og fordi PCA‑baserede plots ikke kan håndtere
+# kategoriske variabler på samme valide måde.
+
+mds <- cmdscale(gower_dist, k = 2, eig = TRUE)
+
+mds_df <- data.frame(
+  Dim1 = mds$points[,1],
+  Dim2 = mds$points[,2],
+  cluster = cluster_vars$cluster
+)
+
+ggplot(mds_df, aes(Dim1, Dim2, color = cluster)) +
+  geom_point(alpha = 0.7, size = 2) +
+  theme_minimal() +
+  labs(title = "MDS-visualisering af Gower-baserede klynger",
+       x = "Dimension 1", y = "Dimension 2")
+
+
 
 # Forklaring af klyngerne:
 
@@ -92,7 +122,8 @@ glimpse(cluster_profile)
 # - Lav retention og høj churn.
 # - Læser primært forside og indland.
 # - Kort abonnementslængde.
-# Essens: En prisfølsom og lavengageret gruppe, der ofte kommer via kampagner og hurtigt falder fra.
+# Essens: En prisfølsom og lavengageret gruppe, der ofte kommer via kampagner 
+# og hurtigt falder fra.
 
 # Klynge 3 – "De engagerede, modne kvalitetslæsere"
 # - Høj aktivitet: mange besøg, mange artikler, høj scroll.
@@ -116,13 +147,3 @@ glimpse(cluster_profile)
 # Vi kan også se at brugere der læser dybere indhold (artikler, indland, sport,
 # analyser) har markant lavere churn end dem der læser noget "overfladisk" son
 # fx økonomi og udland. 
-
-# 1. Hvad er dit mål?
-# Du forsøger at segmentere abonnenter baseret på:
-#   
-#   både numeriske variabler (scroll, sidevisninger, alder …)
-# 
-# og kategoriske variabler (køn, type, device‑valg, length_group …)
-# 
-# Det betyder, at du arbejder med mixed data.
-
