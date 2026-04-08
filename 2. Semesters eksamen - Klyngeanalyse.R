@@ -47,6 +47,44 @@ cluster_vars <- cluster_vars_raw %>%
 # 6. Beregning af Gower distance ------------------------------------------
 gower_dist <- daisy(cluster_vars %>% select(-pseudo_id), metric = "gower")
 
+# 6B. Elbow-plot og silhouette — begrundelse for valg af k ----------------
+
+# Elbow-metoden: beregn within-cluster sum of squares for k = 2 til 8
+# og find det punkt hvor kurven "knækker" — det optimale antal klynger
+wss <- map_dbl(2:8, function(k) {
+  cutree(hc, k = k) %>%
+    { silhouette(., gower_dist) } %>%
+    summary() %>%
+    { sum((cluster_vars %>% mutate(cl = cutree(hc, k = k)) %>%
+             group_by(cl) %>%
+             summarise(n = n()))$n) }
+})
+
+# Silhouette-scores: måler hvor godt hver observation passer i sin klynge
+# Score tæt på 1 = godt placeret, tæt på 0 = på grænsen, negativ = forkert klynge
+sil_scores <- map_dbl(2:8, function(k) {
+  sil <- silhouette(cutree(hc, k = k), gower_dist)
+  mean(sil[, "sil_width"])
+})
+
+# Vi plotter silhouette-scores for at bestemme optimalt k
+tibble(k = 2:8, silhouette = sil_scores) %>%
+  ggplot(aes(x = k, y = silhouette)) +
+  geom_line(color = "steelblue", lwd = 1) +
+  geom_point(color = "steelblue", size = 3) +
+  geom_vline(xintercept = which.max(sil_scores) + 1,
+             linetype = "dashed", color = "firebrick") +
+  labs(
+    title    = "Silhouette-score pr. antal klynger",
+    subtitle = "Højere score = bedre intern kohæsion. Rød linje = valgt k",
+    x = "Antal klynger (k)", y = "Gennemsnitlig silhouette-score"
+  ) +
+  theme_minimal()
+
+cat("Optimalt k baseret på silhouette:", which.max(sil_scores) + 1, "\n")
+
+
+
 # 7. Hierarkisk clustering -------------------------------------------------
 hc <- hclust(gower_dist, method = "ward.D2")
 plot(hc, main = "Hierarkisk clustering – kundetyper")
@@ -75,6 +113,68 @@ cluster_profile <- model_data_clean %>%
   )
 
 glimpse(cluster_profile)
+
+# 11. Visualisering af klynger ---------------------------------------------
+
+# Churn-rate pr. klynge — viser hvilke segmenter der er i størst risiko
+model_data_clean %>%
+  group_by(cluster) %>%
+  summarise(
+    churn_rate      = mean(continued_after_campaign == 0, na.rm = TRUE),
+    hurtig_churn    = mean(fast_churn == 1, na.rm = TRUE),
+    antal_kunder    = n()
+  ) %>%
+  pivot_longer(cols = c(churn_rate, hurtig_churn), names_to = "type", values_to = "andel") %>%
+  ggplot(aes(x = cluster, y = andel, fill = type)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(
+    values = c("churn_rate" = "firebrick", "hurtig_churn" = "steelblue"),
+    labels = c("Churn ved kampagneslut", "Hurtig churn på listepris")
+  ) +
+  labs(
+    title    = "Churn-rate pr. kundesegment",
+    subtitle = "Klynge 2 har højest risiko — Klynge 4 er mest stabil",
+    x = "Klynge", y = "Andel", fill = NULL
+  ) +
+  theme_minimal()
+
+# Aktivitet vs. alder farvet efter klynge — viser segmenternes profil visuelt
+model_data_clean %>%
+  left_join(behavior_agg %>% select(pseudo_id, antal_sidevisninger), by = "pseudo_id") %>%
+  filter(!is.na(antal_sidevisninger), !is.na(age)) %>%
+  ggplot(aes(x = age, y = antal_sidevisninger, color = cluster)) +
+  geom_point(alpha = 0.5, size = 1.5) +
+  scale_color_manual(values = c("1" = "steelblue", "2" = "firebrick",
+                                "3" = "darkgreen",  "4" = "darkorange")) +
+  labs(
+    title    = "Alder vs. aktivitet pr. kundesegment",
+    subtitle = "Hvert punkt er en abonnent — farve angiver klyngetilhørsforhold",
+    x = "Alder", y = "Antal sidevisninger (30 dage)", color = "Klynge"
+  ) +
+  theme_minimal()
+
+# Navngivet klyngetabel til rapport
+klynge_tabel <- tibble(
+  Klynge  = c("1", "2", "3", "4"),
+  Navn    = c("De stabile kernebrugere",
+              "De lette mobile kampagnebrugere",
+              "De engagerede kvalitetslæsere",
+              "De ekstremt loyale langtidssubscribers"),
+  Risiko  = c("Middel", "Høj", "Lav", "Meget lav"),
+  Essens  = c(
+    "Høj aktivitet, men lav fastholdelse efter kampagne",
+    "Prisfølsom og lavengageret — churner hurtigt",
+    "Bred læseadfærd, stabil og værdifuld",
+    "Fundamentet i forretningen — ingen churn"
+  )
+)
+
+print(klynge_tabel)
+
+
+
+
 
 # Forklaring af klyngerne:
 
