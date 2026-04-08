@@ -24,14 +24,10 @@ model_data <- model_data %>%
 # variablen er en factor. 
 model_data <- model_data %>%
   mutate(
-    campaign_group = case_when(
-      str_detect(order_trackertag, "Basis") ~ "Basis",
-      str_detect(order_trackertag, "Marts") ~ "Marts",
-      str_detect(order_trackertag, "Biler") ~ "Biler",
-      str_detect(order_trackertag, "FB") ~ "Facebook",
-      str_detect(order_trackertag, "adwords") ~ "Google",
-      TRUE ~ "Other"
-    ) %>% as.factor()
+    order_date = as.Date(order_date),
+    usr_created = as.Date(usr_created),
+    subscription_cancel_date = as.Date(subscription_cancel_date),
+    birthdate = as.Date(birthdate)
   )
 
 # Fjerning af ID'er og tekststrenge, som vi ikke skal bruge i modellen, da det
@@ -62,6 +58,7 @@ model_data <- model_data %>%
   ) %>%
   drop_na()
 
+
 # 4. Leakage-variabler ----------------------------------------------------
 
 # Vi fjerner nu alle leaker-variabler i modellen:
@@ -74,7 +71,14 @@ model_data <- model_data %>%
     -newsletters_after_order,
     -fast_churn,
     -subscription_length_days,
-    -length_group
+    -length_group,
+    -type,
+    -order_date,
+    -usr_created,
+    -birthdate,
+    -first_campaign_day,
+    -last_campaign_day,
+    -days_between_signup_and_order
   )
 
 # Vi har nu fjerner de variabler, som indeholder infromation om fremtiden
@@ -92,10 +96,7 @@ train_index <- createDataPartition(model_data$continued_after_campaign, p = 0.8,
 train_data <- model_data[train_index, ]
 test_data  <- model_data[-train_index, ]
 
-# Vi ensretter factor-levels
-train_data$campaign_group <- factor(train_data$campaign_group)
-test_data$campaign_group  <- factor(test_data$campaign_group,
-                                    levels = levels(train_data$campaign_group))
+glimpse(model_data)
 
 # 6. Logistisk regression ----------------------------------------------------
 
@@ -117,7 +118,6 @@ cut_log <- as.numeric(coords(roc_log, "best", ret = "threshold"))
 log_pred <- ifelse(log_prob > cut_log, "1", "0") %>% factor(levels = c("0","1"))
 cm_log <- confusionMatrix(log_pred, test_data$continued_after_campaign)
 cm_log
-
 
 # 7. Random Forest -----------------------------------------------------------
 
@@ -283,18 +283,12 @@ xgb_imp %>%
 
 # Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
 # fortsætter efter kampagneperioden. Vi har brugt korrekt feature engineering og
-# fjernet dataleakage, og opnået en XGBoost-model med en accuracy på 77,7%.
-# Modellen identificerer 80% af churnerne og 75% af de kunder, der fortsætter, 
-# hvilket gør den velegnet til at understøtte JPs problemstillinger. 
-
-# 11. Konklusion til ML-model nr. 1 NØGLETAL ------------------------------------------
-
-# Vi udprinter en samlet konklusion baseret på de faktiske modelresultater
-cat("=== MODEL 1 KONKLUSION ===\n")
-cat("Bedste model (AUC):", model_sammenligning$Model[which.max(model_sammenligning$AUC)], "\n")
-cat("AUC:        ", max(model_sammenligning$AUC), "\n")
-cat("Accuracy:   ", model_sammenligning$Accuracy[which.max(model_sammenligning$AUC)], "\n")
-cat("Sensitivity:", model_sammenligning$Sensitivity[which.max(model_sammenligning$AUC)], "\n")
-cat("Specificity:", model_sammenligning$Specificity[which.max(model_sammenligning$AUC)], "\n")
-cat("\nModellerne er rangeret efter AUC fremfor accuracy, da churn-data\n")
-cat("er class-imbalanced. AUC måler skelneevnen uafhængigt af klassefordeling.\n")
+# fjernet dataleakage, og lavet en XGBoost-model med en accuracy på 74,8%.
+# Modellen identificerer 79% af churnerne og 70,6% af de kunder, der fortsætter, 
+# hvilket gør den velegnet til at understøtte JPs problemstillinger. Vores 
+# logistisk regressionsmodel performer dårligt, og vurderes ikke egnet til
+# JPs forretningsproblem. Random Forest modellen er også meget stærk. Den 
+# finder 68% af dem der churnere, og 82,4% af dem der forsætter. Hvis vi vil
+# finde det største antal af churnere, så er XGBoost den bedste. Hvis vi vil 
+# finde det største antal af dem der forsætter, så er RF den bedste. Begge 
+# modeller er egnet til JPs problemstillinger, alt efter hvilket mål de har. 

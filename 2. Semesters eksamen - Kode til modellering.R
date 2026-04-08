@@ -1,4 +1,4 @@
-acman::p_load(tidyverse, lubridate, readr)
+pacman::p_load(tidyverse, lubridate, readr)
 
 # 1. Indlæsning af data -------------------------------------------------------
 
