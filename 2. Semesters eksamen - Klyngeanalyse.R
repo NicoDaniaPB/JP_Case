@@ -108,7 +108,7 @@ ggplot(mds_df, aes(Dim1, Dim2, color = cluster)) +
 
 # Forklaring af klyngerne:
 
-# Klynge 1 – "De stabile, loyale kernebrugere"
+# Klynge 1 – "De tunge, men ustabile brugere"
 # - Høj aktivitet: mange sidevisninger, mange unikke sider, høj restricted-brug.
 # - Primært desktop-brugere.
 # - Moderat alder (ca. 60 år).
@@ -147,3 +147,10 @@ ggplot(mds_df, aes(Dim1, Dim2, color = cluster)) +
 # Vi kan også se at brugere der læser dybere indhold (artikler, indland, sport,
 # analyser) har markant lavere churn end dem der læser noget "overfladisk" son
 # fx økonomi og udland. 
+
+# Visualisering:
+# Vi kan se at klynge 2 er mest unik (den gruppe der har størst risiko for churn).
+# Vi kan se at klynge 3 og 4 minder mest om hinanden. 
+# Klynge 1 er i midten, dvs det er "Mellemgruppen". 
+# Man kan også se at gruppen i klynge 1 ikke er tabt, de ligger et mellemsted
+# mellem grøn (som er helt tabt) og klynge 3 og 4 som har lavest churn-risiko. 

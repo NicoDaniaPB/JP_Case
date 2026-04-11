@@ -292,3 +292,8 @@ xgb_imp %>%
 # finde det største antal af churnere, så er XGBoost den bedste. Hvis vi vil 
 # finde det største antal af dem der forsætter, så er RF den bedste. Begge 
 # modeller er egnet til JPs problemstillinger, alt efter hvilket mål de har. 
+
+
+# 12. Gem som RDS-fil til Shiny App -------------------------------------------
+
+saveRDS(xgb_model, "model/xgb_model.rds")
