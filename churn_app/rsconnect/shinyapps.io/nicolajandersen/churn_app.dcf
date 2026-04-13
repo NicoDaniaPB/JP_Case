@@ -1,0 +1,12 @@
+name: churn_app
+title: churn_app
+username: nicolajandersen
+account: nicolajandersen
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16830779
+bundleId: 11670831
+url: https://nicolajandersen.shinyapps.io/churn_app/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
