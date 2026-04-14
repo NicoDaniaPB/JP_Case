@@ -35,6 +35,15 @@ model_data <- model_data %>%
 model_data <- model_data %>%
   select(-pseudo_id, -order_trackertag, -reason)
 
+# Gør target til gyldige factor-levels
+model_data <- model_data %>%
+  mutate(
+    continued_after_campaign = factor(
+      continued_after_campaign,
+      levels = c(0, 1),
+      labels = c("No", "Yes")
+    )
+  )
 # 3. Feature engineering -----------------------------------------------------
 
 # Vi opretter nu nogle nye features, som skal være med til at øge modellens 
@@ -53,8 +62,7 @@ model_data <- model_data %>%
     engagement_score = (visits * 0.4) + (unique_pages * 0.3) + (avg_scroll * 0.3),
     mobile_heavy = ifelse(mobile_ratio > 0.7, 1, 0),
     age_engagement_interaction = age * engagement_score,
-    permission_engagement = permission_user * engagement_score,
-    continued_after_campaign = as.factor(continued_after_campaign)
+    permission_engagement = permission_user * engagement_score
   ) %>%
   drop_na()
 
@@ -96,9 +104,30 @@ train_index <- createDataPartition(model_data$continued_after_campaign, p = 0.8,
 train_data <- model_data[train_index, ]
 test_data  <- model_data[-train_index, ]
 
-glimpse(model_data)
-
 # 6. Logistisk regression ----------------------------------------------------
+
+# Vi sikrer reproducerbarhed
+set.seed(47)
+
+# Vi laver cross validation
+cv_ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+log_cv <- train(
+  continued_after_campaign ~ .,
+  data = train_data,
+  method = "glm",
+  family = binomial,
+  trControl = cv_ctrl,
+  metric = "ROC"
+)
+
+log_cv
+
 
 # Vi træner en logistisk regressionsmodel på alle vores variabler
 log_model <- glm(
@@ -115,7 +144,9 @@ roc_log <- roc(test_data$continued_after_campaign, log_prob)
 cut_log <- as.numeric(coords(roc_log, "best", ret = "threshold"))
 
 # Vi konverterer sandsynlighederne til klasser og beregner confusion matrix
-log_pred <- ifelse(log_prob > cut_log, "1", "0") %>% factor(levels = c("0","1"))
+log_pred <- ifelse(log_prob > cut_log, "Yes", "No") %>%
+  factor(levels = c("No", "Yes"))
+
 cm_log <- confusionMatrix(log_pred, test_data$continued_after_campaign)
 cm_log
 
@@ -123,6 +154,18 @@ cm_log
 
 # Vi sikrer reproducerbarhed
 set.seed(47)
+
+# Cross validation 
+rf_cv <- train(
+  continued_after_campaign ~ .,
+  data = train_data,
+  method = "rf",
+  trControl = cv_ctrl,
+  metric = "ROC",
+  tuneLength = 5
+)
+
+rf_cv
 
 # Vi laver vores Random Forest model
 rf_model <- randomForest(
@@ -141,11 +184,16 @@ roc_rf <- roc(test_data$continued_after_campaign, rf_prob)
 cut_rf <- as.numeric(coords(roc_rf, "best", ret = "threshold"))
 
 # Klassifikation
-rf_pred <- ifelse(rf_prob > cut_rf, "1", "0") %>% factor(levels = c("0","1"))
+rf_pred <- ifelse(rf_prob > cut_rf, "Yes", "No") %>%
+  factor(levels = c("No", "Yes"))
 
 # # Vi laver vores Confusion Matrix
 cm_rf <- confusionMatrix(rf_pred, test_data$continued_after_campaign)
 cm_rf
+
+levels(rf_pred)
+levels(test_data$continued_after_campaign)
+
 
 # 8. XGBoost-----------------------------------------------------------------
 
@@ -155,19 +203,37 @@ full_matrix <- model.matrix(continued_after_campaign ~ . - 1, data = model_data)
 # Vi konverterer target til numerisk
 full_label <- as.numeric(model_data$continued_after_campaign) - 1
 
-# Vi splitter matrix og labels i train/test
+# Split i train/test
 train_matrix <- full_matrix[train_index, ]
 test_matrix  <- full_matrix[-train_index, ]
 
-train_label <- full_label[train_index]
-test_label  <- full_label[-train_index]
+# Brug den originale factor-target til CV
+y_train <- model_data$continued_after_campaign[train_index]
 
-# Vi lav en DMatrix
-dtrain <- xgb.DMatrix(data = train_matrix, label = train_label)
-dtest  <- xgb.DMatrix(data = test_matrix,  label = test_label)
+# DMatrix til XGBoost-modellen
+dtrain <- xgb.DMatrix(data = train_matrix,
+                      label = as.numeric(y_train) - 1)
+dtest  <- xgb.DMatrix(data = test_matrix,
+                      label = as.numeric(model_data$continued_after_campaign[-train_index]) - 1)
 
 # Vi sikrer reproducerbarhed
 set.seed(47)
+
+# Cross validation
+xgb_cv2 <- xgb.cv(
+  data = dtrain,
+  nrounds = 300,
+  max_depth = 4,
+  eta = 0.05,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  nfold = 5,
+  verbose = 0
+)
+
+xgb_cv2
 
 # Vi træner vores XGBoost-model
 xgb_model <- xgb.train(
@@ -189,7 +255,8 @@ roc_xgb <- roc(test_data$continued_after_campaign, xgb_prob)
 cut_xgb <- as.numeric(coords(roc_xgb, "best", ret = "threshold"))
 
 # Klassifikation
-xgb_pred <- ifelse(xgb_prob > cut_xgb, "1", "0") %>% factor(levels = c("0","1"))
+xgb_pred <- ifelse(xgb_prob > cut_xgb, "Yes", "No") %>%
+  factor(levels = c("No", "Yes"))
 
 # Vi laver vores Confusion Matrix
 cm_xgb <- confusionMatrix(xgb_pred, test_data$continued_after_campaign)
@@ -279,21 +346,56 @@ xgb_imp %>%
   theme_minimal()
 
 
-# 11. Konklusion til ML-model nr. 1 --------------------------------------------
+# 11. Cross validation sammenligning --------------------------------------
+
+# Udtræk af CV-resultater fra logistisk regression (caret-pakken)
+log_cv_results <- log_cv$results %>%
+  select(ROC, Sens, Spec) %>%
+  slice(which.max(ROC)) %>%
+  mutate(Model = "Logistisk regression")
+
+# Udtræk af CV-resultater fra Random Forest (caret-pakken)
+rf_cv_results <- rf_cv$results %>%
+  select(ROC, Sens, Spec) %>%
+  slice(which.max(ROC)) %>%
+  mutate(Model = "Random Forest")
+
+# Udtræk  af CV-resultater fra XGBoost (xgb.cv)
+xgb_cv_results <- tibble(
+  Model = "XGBoost",
+  ROC   = max(xgb_cv2$evaluation_log$test_auc_mean),
+  Sens  = NA,   # xgb.cv giver ikke Sens/Spec direkte
+  Spec  = NA
+)
+
+# Vi samler alle CV-resultater i en tabel
+cv_sammenligning <- bind_rows(
+  log_cv_results,
+  rf_cv_results,
+  xgb_cv_results
+) %>%
+  select(Model, ROC, Sens, Spec)
+
+# Vi ser resultatet
+print(cv_sammenligning)
+
+# Vi kan se, at XGboost modellen opnår den højeste cross validation ROC på 
+# 89,45%. Hvilket betyder, at det er den der generaliser bedst på nye ukendte 
+# data. 
+
+# 12. Konklusion til ML-model nr. 1 --------------------------------------------
 
 # Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
 # fortsætter efter kampagneperioden. Vi har brugt korrekt feature engineering og
-# fjernet dataleakage, og lavet en XGBoost-model med en accuracy på 74,8%.
-# Modellen identificerer 79% af churnerne og 70,6% af de kunder, der fortsætter, 
-# hvilket gør den velegnet til at understøtte JPs problemstillinger. Vores 
-# logistisk regressionsmodel performer dårligt, og vurderes ikke egnet til
-# JPs forretningsproblem. Random Forest modellen er også meget stærk. Den 
-# finder 68% af dem der churnere, og 82,4% af dem der forsætter. Hvis vi vil
-# finde det største antal af churnere, så er XGBoost den bedste. Hvis vi vil 
-# finde det største antal af dem der forsætter, så er RF den bedste. Begge 
-# modeller er egnet til JPs problemstillinger, alt efter hvilket mål de har. 
+# fjernet dataleakage, og lavet tre forskellige klassifikationsmodeller. XGBoost
+# modellen opnår den højeste AUC på 0.931 og den bedste balance mellem 
+# sensitivity og specificity. Det er derfor den bedste model til at forudsige 
+# churn efter kampagnen. 
+# XGBoost-model har en accuracy på 86,3%. Modellen identificerer 88% af 
+# churnerne og 85% af de kunder, der fortsætter, hvilket gør den velegnet til 
+# at understøtte JPs problemstillinger. 
 
+# 13. Gem som RDS-fil til Shiny App -------------------------------------------
 
-# 12. Gem som RDS-fil til Shiny App -------------------------------------------
+saveRDS(xgb_model, "xgb_model.rds")
 
-saveRDS(xgb_model, "model/xgb_model.rds")
