@@ -8,7 +8,7 @@ subscription2 <- read_csv("data/subscription_v2.csv")
 
 # 1B. Split og parse subscription2 -------------------------------------------
 
-subscription2_clean <- subscription %>%
+subscription2_clean <- subscription2 %>%
   separate(
     col = 1,
     into = c(
