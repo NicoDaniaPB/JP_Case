@@ -6,10 +6,9 @@ behavior <- read_csv("data/behavior.csv")
 cancellation <- read_csv("data/cancellation.csv")
 subscription2 <- read_csv("data/subscription_v2.csv")
 
-
 # 1B. Split og parse subscription2 -------------------------------------------
 
-subscription2_clean <- subscription2 %>%
+subscription2_clean <- subscription %>%
   separate(
     col = 1,
     into = c(
@@ -26,14 +25,19 @@ subscription2_clean <- subscription2 %>%
   mutate(
     # Datoer i dd-mm-yyyy format
     subscription_cancel_date = dmy(subscription_cancel_date),
+    subscription_cancel_date = if_else(
+      subscription_cancel_date == as.Date("3000-01-01"),
+      NA_Date_,
+      subscription_cancel_date
+    ),
     birthdate = dmy(birthdate),
     usr_created = dmy(usr_created),
     first_campaign_day = dmy(first_campaign_day),
     last_campaign_day = dmy(last_campaign_day),
-
+    
     # order_date er datetime
     order_date = ymd_hms(order_date),
-
+    
     # Tal
     account_active_days = as.numeric(account_active_days),
     previous_subscriptions = as.numeric(previous_subscriptions),
@@ -41,23 +45,31 @@ subscription2_clean <- subscription2 %>%
     previous_trials = as.numeric(previous_trials),
     newsletters_before_order = as.numeric(newsletters_before_order),
     newsletters_after_order = as.numeric(newsletters_after_order),
-
+    
     # Logiske værdier
     permission_given_order = as.logical(permission_given_order),
-    permission_given_today = as.logical(permission_given_today)
+    permission_given_today = as.logical(permission_given_today), 
+    
+    # 27 ukendte køn 
+    koen = if_else(koen == "" | is.na(koen), "Ukendt", koen)
   )
 
-
+# Se de rækker der ville blive fjernet
+subscription2_clean %>%
+  group_by(pseudo_id) %>%
+  filter(n() > 1) %>%
+  arrange(pseudo_id, order_date) %>%
+  select(pseudo_id, order_date, subscription_cancel_date)
 # 2. Fjern dubletter ---------------------------------------------------------
 
 subscription_renset <- subscription2_clean %>%
   group_by(pseudo_id) %>%
-  slice_max(order_date) %>%
+  slice_max(order_date, with_ties = FALSE) %>%
   ungroup()
 
 cancellation_renset <- cancellation %>%
   group_by(pseudo_id) %>%
-  slice_max(expiration_date) %>%
+  slice_max(expiration_date, with_ties = FALSE) %>%
   ungroup()
 
 
@@ -120,7 +132,20 @@ sub_cancel <- sub_cancel %>%
         subscription_cancel_date > last_campaign_day,
       1, 0
     ),
-    fast_churn = if_else(subscription_length_days < 90, 1, 0)
+    fast_churn = if_else(
+      subscription_length_days <= 3 & continued_after_campaign == 0,
+      1, 0
+    ),
+    fast_churn_converted = if_else(
+      subscription_length_days <= 3 & continued_after_campaign == 1,
+      1, 0
+    ),
+    churn_30 = if_else(
+      continued_after_campaign == 1 &
+        !is.na(subscription_cancel_date) &
+        as.numeric(subscription_cancel_date - last_campaign_day) <= 30,
+      1, 0
+    )
   )
 
 
@@ -139,7 +164,20 @@ behavior_features <- behavior %>%
   )
 
 full_data <- sub_cancel %>%
-  left_join(behavior_features, by = "pseudo_id")
+  left_join(behavior_features, by = "pseudo_id") %>%
+  mutate(
+    across(c(visits, unique_pages, restricted_views,
+             restricted_ratio, avg_scroll, mobile_ratio,
+             desktop_ratio), ~replace_na(., 0)),
+    usr_created = if_else(is.na(usr_created), as.Date(order_date), usr_created),
+    type   = if_else(is.na(type) & !is.na(subscription_cancel_date), "Ukendt", type),
+    reason = if_else(is.na(reason) & !is.na(subscription_cancel_date), "Ukendt", reason),
+    expiration_date = if_else(
+      is.na(expiration_date) & !is.na(subscription_cancel_date),
+      subscription_cancel_date,
+      expiration_date
+    )
+  )
 
 
 # 9. Gem det rensede datasæt -------------------------------------------------
