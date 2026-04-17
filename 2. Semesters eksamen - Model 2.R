@@ -7,7 +7,10 @@ pacman::p_load(tidyverse, lubridate, caret, pROC, randomForest, xgboost)
 # at køre RF og Boosting modellerne.
 
 # Vores anden model skal kunne klassificere, om kunder der fortsætter efter
-# kampagneperioden churner inden for 30 dage eller ej.
+# kampagneperioden churner inden for 10 dage eller ej.
+# Argumentationen for 10 dage: abonnementet er forudbetalt, og kunder der
+# glemte at afmelde vil typisk opdage det når de ser første betaling og
+# afmelde inden for de første 10 dage efter kampagnens afslutning.
 
 # 1. Indlæsning af data ---------------------------------------
 model_data <- read_rds("data/renset_datasæt.rds")
@@ -18,12 +21,12 @@ model_data <- read_rds("data/renset_datasæt.rds")
 model2_data <- model_data %>%
   filter(continued_after_campaign == 1)
 
-# Target-variabel: churn_30
+# Target-variabel: churn_10
 # Vi konverterer til factor med gyldige labels til caret
 model2_data <- model2_data %>%
   mutate(
-    churn_30 = factor(
-      churn_30,
+    churn_10 = factor(
+      churn_10,
       levels = c(0, 1),
       labels = c("No", "Yes")
     )
@@ -32,7 +35,7 @@ model2_data <- model2_data %>%
 # 3. Feature engineering --------------------------------------------------
 
 # Vi opretter nu nogle nye features, som skal være med til at øge modellens 
-# forklaringskraft. 
+# forklaringskraft. Udover det, så fjerner vi også NA-værdierne. 
 model2_data <- model2_data %>%
   mutate(
     days_since_user_created = as.numeric(difftime(order_date, usr_created, units = "days")),
@@ -59,7 +62,7 @@ model2_data <- model2_data %>%
     newsletters_before_order,
     newsletters_after_order,
     
-    # Adfærd de første 30 dage af kampagnen
+    # Adfærd de første 30 dage (ingen leakage – kampagnen er 2 måneder)
     visits,
     unique_pages,
     restricted_views,
@@ -75,9 +78,8 @@ model2_data <- model2_data %>%
     has_previous_subscriptions,
     
     # Target
-    churn_30
-  ) %>%
-  drop_na()
+    churn_10
+  ) 
 
 # Vi har kun beholdt variabler som er kendte ved eller kort efter køb.
 # permission_given_today er fjernet da den er målt pr. 10. marts 2026 (fremtidig info).
@@ -90,7 +92,7 @@ model2_data <- model2_data %>%
 set.seed(47)
 
 # Vi laver et 80/20 split 
-train_index2 <- createDataPartition(model2_data$churn_30, p = 0.8, list = FALSE)
+train_index2 <- createDataPartition(model2_data$churn_10, p = 0.8, list = FALSE)
 train_data2 <- model2_data[train_index2, ]
 test_data2  <- model2_data[-train_index2, ]
 
@@ -108,7 +110,7 @@ cv_ctrl2 <- trainControl(
 )
 
 log_cv2 <- train(
-  churn_30 ~ .,
+  churn_10 ~ .,
   data = train_data2,
   method = "glm",
   family = binomial,
@@ -119,19 +121,19 @@ log_cv2 <- train(
 log_cv2
 
 # Vi træner en logistisk regressionsmodel på alle vores variabler
-log_model2 <- glm(churn_30 ~ ., data = train_data2, family = binomial)
+log_model2 <- glm(churn_10 ~ ., data = train_data2, family = binomial)
 
 # Prediction - Vi forudsiger sandsynligheder for vores testdatasæt
 log_prob2 <- predict(log_model2, test_data2, type = "response")
 
 # Vi bereger ROC-kurven og finder det optimale cutoff
-roc_log2 <- roc(test_data2$churn_30, log_prob2)
+roc_log2 <- roc(test_data2$churn_10, log_prob2)
 cut_log2 <- as.numeric(coords(roc_log2, "best", ret = "threshold"))
 
 # Vi konverterer sandsynlighederne til klasser og beregner confusion matrix
 log_pred2 <- ifelse(log_prob2 > cut_log2, "Yes", "No") %>%
   factor(levels = c("No", "Yes"))
-cm_log2 <- confusionMatrix(log_pred2, test_data2$churn_30)
+cm_log2 <- confusionMatrix(log_pred2, test_data2$churn_10)
 cm_log2
 
 # 7. Random Forest --------------------------------------------
@@ -141,7 +143,7 @@ set.seed(47)
 
 # Cross validation
 rf_cv2 <- train(
-  churn_30 ~ .,
+  churn_10 ~ .,
   data = train_data2,
   method = "rf",
   trControl = cv_ctrl2,
@@ -153,7 +155,7 @@ rf_cv2
 
 # Vi laver vores Random Forest model
 rf_model2 <- randomForest(
-  churn_30 ~ .,
+  churn_10 ~ .,
   data = train_data2,
   ntree = 500,
   mtry = floor(sqrt(ncol(train_data2) - 1)),
@@ -164,7 +166,7 @@ rf_model2 <- randomForest(
 rf_prob2 <- predict(rf_model2, test_data2, type = "prob")[,2]
 
 # Vi bereger ROC-kurven og finder det optimale cutoff
-roc_rf2 <- roc(test_data2$churn_30, rf_prob2)
+roc_rf2 <- roc(test_data2$churn_10, rf_prob2)
 cut_rf2 <- as.numeric(coords(roc_rf2, "best", ret = "threshold"))
 
 # Klassifikation
@@ -172,23 +174,23 @@ rf_pred2 <- ifelse(rf_prob2 > cut_rf2, "Yes", "No") %>%
   factor(levels = c("No", "Yes"))
 
 # Vi laver vores Confusion Matrix
-cm_rf2 <- confusionMatrix(rf_pred2, test_data2$churn_30)
+cm_rf2 <- confusionMatrix(rf_pred2, test_data2$churn_10)
 cm_rf2
 
 # 8. XGBoost ---------------------------------------------------
 
 # Vi laver en samlet model.matrix for hele datasættet
-full_matrix2 <- model.matrix(churn_30 ~ . - 1, data = model2_data)
+full_matrix2 <- model.matrix(churn_10 ~ . - 1, data = model2_data)
 
 # Vi konverterer target til numerisk
-full_label2  <- as.numeric(model2_data$churn_30) - 1
+full_label2  <- as.numeric(model2_data$churn_10) - 1
 
 # Vi splitter matrix og labels i train/test
 train_matrix2 <- full_matrix2[train_index2, ]
 test_matrix2  <- full_matrix2[-train_index2, ]
 
 # Brug den originale factor-target til CV
-y_train2 <- model2_data$churn_30[train_index2]
+y_train2 <- model2_data$churn_10[train_index2]
 
 train_label2 <- full_label2[train_index2]
 test_label2  <- full_label2[-train_index2]
@@ -196,21 +198,23 @@ test_label2  <- full_label2[-train_index2]
 # Vi laver en DMatrix
 dtrain2 <- xgb.DMatrix(data = train_matrix2, label = as.numeric(y_train2) - 1)
 dtest2  <- xgb.DMatrix(data = test_matrix2,
-                       label = as.numeric(model2_data$churn_30[-train_index2]) - 1)
+                       label = as.numeric(model2_data$churn_10[-train_index2]) - 1)
 
 # Vi sikrer reproducerbarhed
 set.seed(47)
 
 # Cross validation
 xgb_cv2 <- xgb.cv(
+  params = list(
+    max_depth = 4,
+    eta = 0.05,
+    subsample = 0.8,
+    colsample_bytree = 0.8,
+    objective = "binary:logistic",
+    eval_metric = "auc"
+  ),
   data = dtrain2,
   nrounds = 300,
-  max_depth = 4,
-  eta = 0.05,
-  subsample = 0.8,
-  colsample_bytree = 0.8,
-  objective = "binary:logistic",
-  eval_metric = "auc",
   nfold = 5,
   verbose = 0
 )
@@ -235,7 +239,7 @@ xgb_model2 <- xgb.train(
 xgb_prob2 <- predict(xgb_model2, dtest2)
 
 # ROC og cutoff
-roc_xgb2 <- roc(test_data2$churn_30, xgb_prob2)
+roc_xgb2 <- roc(test_data2$churn_10, xgb_prob2)
 cut_xgb2 <- as.numeric(coords(roc_xgb2, "best", ret = "threshold"))
 
 # Klassifikation
@@ -243,7 +247,7 @@ xgb_pred2 <- ifelse(xgb_prob2 > cut_xgb2, "Yes", "No") %>%
   factor(levels = c("No", "Yes"))
 
 # Vi laver vores Confusion Matrix
-cm_xgb2 <- confusionMatrix(xgb_pred2, test_data2$churn_30)
+cm_xgb2 <- confusionMatrix(xgb_pred2, test_data2$churn_10)
 cm_xgb2
 
 # 9. AUC-sammenligning -------------------------------------------------------
@@ -275,7 +279,7 @@ model_sammenligning2 <- tibble(
 print(model_sammenligning2)
 
 plot(roc_log2, col = "steelblue", lwd = 2,
-     main = "ROC-kurver — Model 2 (churn_30 efter kampagneslut)")
+     main = "ROC-kurver — Model 2 (churn_10 efter kampagneslut)")
 plot(roc_rf2,  col = "darkgreen", lwd = 2, add = TRUE)
 plot(roc_xgb2, col = "firebrick", lwd = 2, add = TRUE)
 legend("bottomright",
@@ -363,17 +367,19 @@ print(cv_sammenligning2)
 
 # 12. Konklusion til model nr. 2 -------------------------------------------
 
-# Vi har udviklet en klassifikationsmodel til at forudsige churn_30 blandt
-# kunder der fortsætter efter kampagneperioden. XGBoost er den bedste model
-# med AUC = 0.788 og en god balance mellem sensitivity (85.7%) og
-# specificity (59.4%), hvilket betyder modellen er god til at identificere
-# kunder der churner inden for 30 dage efter kampagnens afslutning.
-# Random Forest har lavere AUC (0.757) og dårligere specificity (56.2%),
-# hvilket betyder den misser flere churn-kandidater end XGBoost.
-# Logistisk regression er ikke egnet med AUC på 0.650.
+# Vi har udviklet en klassifikationsmodel til at forudsige churn_10 blandt
+# kunder der fortsætter efter kampagneperioden. Modellen identificerer kunder
+# der churner inden for 10 dage efter kampagnens afslutning — typisk kunder
+# der glemte at afmelde og reagerer når de ser første betaling.
+# XGBoost er den bedste model med AUC = 0.784 og en god balance mellem
+# sensitivity (77.5%) og specificity (71.4%), hvilket gør den velegnet til
+# at identificere risikokunder.
+# Random Forest har lavere AUC (0.780) og dårlig specificity (52.4%),
+# hvilket betyder den misser mange churn-kandidater.
+# Logistisk regression er ikke egnet med AUC på 0.694.
 # Den vigtigste forklarende variabel er account_active_days — kunder med
 # lang historik hos JP churner markant sjældnere end nye kunder.
 
 # 13. Gem som RDS-fil til Shiny App ------------------------------------------
 
-
+saveRDS(xgb_model2, "churn_app/xgb_model2.rds")

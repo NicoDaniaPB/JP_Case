@@ -54,12 +54,6 @@ subscription2_clean <- subscription2 %>%
     koen = if_else(koen == "" | is.na(koen), "Ukendt", koen)
   )
 
-# Se de rækker der ville blive fjernet
-subscription2_clean %>%
-  group_by(pseudo_id) %>%
-  filter(n() > 1) %>%
-  arrange(pseudo_id, order_date) %>%
-  select(pseudo_id, order_date, subscription_cancel_date)
 # 2. Fjern dubletter ---------------------------------------------------------
 
 subscription_renset <- subscription2_clean %>%
@@ -140,10 +134,10 @@ sub_cancel <- sub_cancel %>%
       subscription_length_days <= 3 & continued_after_campaign == 1,
       1, 0
     ),
-    churn_30 = if_else(
+    churn_10 = if_else(
       continued_after_campaign == 1 &
         !is.na(subscription_cancel_date) &
-        as.numeric(subscription_cancel_date - last_campaign_day) <= 30,
+        as.numeric(subscription_cancel_date - last_campaign_day) <= 10,
       1, 0
     )
   )
@@ -179,7 +173,11 @@ full_data <- sub_cancel %>%
     )
   )
 
+# 9. Fjern kunde med ugyldig fødselsdato -------------------------------------------------
 
-# 9. Gem det rensede datasæt -------------------------------------------------
+full_data <- full_data %>%
+  filter(!is.na(birthdate))
+
+# 10. Gem det rensede datasæt -------------------------------------------------
 
 saveRDS(full_data, "data/renset_datasæt.rds")
