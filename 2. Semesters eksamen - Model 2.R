@@ -10,7 +10,7 @@ pacman::p_load(tidyverse, lubridate, caret, pROC, randomForest, xgboost)
 # kampagneperioden churner inden for 30 dage eller ej.
 
 # 1. Indlæsning af data ---------------------------------------
-model_data <- read_rds("churn_app/renset_datasæt.rds")
+model_data <- read_rds("data/renset_datasæt.rds")
 
 # 2. Yderligere klargøring af data til modellerne -------------------------
 
