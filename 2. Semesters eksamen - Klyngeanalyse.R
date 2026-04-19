@@ -154,3 +154,26 @@ ggplot(mds_df, aes(Dim1, Dim2, color = cluster)) +
 # Klynge 1 er i midten, dvs det er "Mellemgruppen". 
 # Man kan også se at gruppen i klynge 1 ikke er tabt, de ligger et mellemsted
 # mellem grøn (som er helt tabt) og klynge 3 og 4 som har lavest churn-risiko. 
+
+
+# 12. Eksportering af datasæt ---------------------------------------------
+
+# Eksportering af datasæt med klynge-profiler
+write_csv(cluster_profile, "klynge_profiler.csv")
+
+# Eksportering af datasæt med cluster-labels
+write_csv(
+  model_data_clean,
+  "model_data_med_klynger.csv"
+)
+
+# Eksportering af MDS-koordinater
+write_csv(
+  mds_df,
+  "mds_coordinates.csv"
+)
+
+
+
+
+
