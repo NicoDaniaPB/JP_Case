@@ -1,27 +1,19 @@
 pacman::p_load(tidyverse, lubridate, caret, randomForest, xgboost, pROC)
 
-# Vi har nu loaded de pakker vi skal bruge. Vi bruger tidyverse til 
-# datamanipulation. lubridate bruges til at håndterer datoer. caret bruges til 
-# train/test split og modelværktøjer. pROC bruges til ROC-kurver og cutoffs i 
-# vores klassifikationsmodeller. randomForest- og xgboost- pakkerne bruges til
-# at køre RF og boosting modellerne. 
-
-# Vores første model skal kunne klassificere, om kunden forsætter efter
-# kampagneperioden, eller om de churner. 
-
 # 1. Indlæsning af data -------------------------------------------------------
-model_data <- read_rds("data/renset_datasæt.rds")
+model_data_raw <- read_rds("data/renset_datasæt.rds")
+
+# ➤ NYT: Gem pseudo_id i model_data_raw (vi fjerner det ikke endnu)
+# pseudo_id skal følge ALLE transformationer
+# så vi lader det blive i model_data indtil lige før modellering
 
 # 2. Yderligere klargøring af data til modellering ------------------------
 
 # Filtrering til kunder med target 
-model_data <- model_data %>%
+model_data <- model_data_raw %>%
   filter(!is.na(continued_after_campaign))
-# Her har vi fjernet alle rækkere, hvor vores mål-variabel mangler.
 
-# Vi opretter en ny variabel "campaign_group", som skal bruges som en 
-# forklarende variabel til vores klassifikationsmodeller. Vi sørger for, at 
-# variablen er en factor. 
+# Datoformatering
 model_data <- model_data %>%
   mutate(
     order_date = as.Date(order_date),
@@ -30,12 +22,11 @@ model_data <- model_data %>%
     birthdate = as.Date(birthdate)
   )
 
-# Fjerning af ID'er og tekststrenge, som vi ikke skal bruge i modellen, da det
-# vil give en fejlmeddelse. 
+# ➤ RETTET: Fjern kun tekststrenge – pseudo_id beholdes
 model_data <- model_data %>%
-  select(-pseudo_id, -order_trackertag, -reason)
+  select(-order_trackertag, -reason)
 
-# Gør target til gyldige factor-levels
+# Target som factor
 model_data <- model_data %>%
   mutate(
     continued_after_campaign = factor(
@@ -44,10 +35,8 @@ model_data <- model_data %>%
       labels = c("No", "Yes")
     )
   )
-# 3. Feature engineering -----------------------------------------------------
 
-# Vi opretter nu nogle nye features, som skal være med til at øge modellens 
-# forklaringskraft. Udover det, så fjerner vi også NA-værdierne. 
+# 3. Feature engineering -----------------------------------------------------
 
 model_data <- model_data %>%
   mutate(
@@ -66,10 +55,8 @@ model_data <- model_data %>%
   ) %>%
   drop_na()
 
-
 # 4. Leakage-variabler ----------------------------------------------------
 
-# Vi fjerner nu alle leaker-variabler i modellen:
 model_data <- model_data %>%
   select(
     -subscription_cancel_date,
@@ -89,27 +76,25 @@ model_data <- model_data %>%
     -days_between_signup_and_order
   )
 
-# Vi har nu fjerner de variabler, som indeholder infromation om fremtiden
-# (fx opsigelsesdato). Dette forhinder dataleakage, og sikrer at vi har en 
-# realistisk model, som kan anvendes i praksis. Vi bruger select til at fjerne
-# variablerne. 
+# ➤ NYT: Fjern pseudo_id lige før modellering
+pseudo_ids <- model_data$pseudo_id
+model_data <- model_data %>% select(-pseudo_id)
 
 # 5. Train/test split --------------------------------------------------------
 
-# Vi sikrer reproducerbarhed
 set.seed(47)
 
-# Vi laver et 80/20 split på vores datasæt
 train_index <- createDataPartition(model_data$continued_after_campaign, p = 0.8, list = FALSE)
 train_data <- model_data[train_index, ]
 test_data  <- model_data[-train_index, ]
 
+# ➤ NYT: Split pseudo_ids korrekt
+test_ids <- pseudo_ids[-train_index]
+
 # 6. Logistisk regression ----------------------------------------------------
 
-# Vi sikrer reproducerbarhed
 set.seed(47)
 
-# Vi laver cross validation
 cv_ctrl <- trainControl(
   method = "cv",
   number = 5,
@@ -126,36 +111,26 @@ log_cv <- train(
   metric = "ROC"
 )
 
-log_cv
-
-
-# Vi træner en logistisk regressionsmodel på alle vores variabler
 log_model <- glm(
   continued_after_campaign ~ ., 
   data = train_data,
   family = binomial
 )
 
-# Prediction - Vi forudsiger sandsynligheder for vores testdatasæt
 log_prob <- predict(log_model, test_data, type = "response")
 
-# Vi bereger ROC-kurven og finder det optimale cutoff
 roc_log <- roc(test_data$continued_after_campaign, log_prob)
 cut_log <- as.numeric(coords(roc_log, "best", ret = "threshold"))
 
-# Vi konverterer sandsynlighederne til klasser og beregner confusion matrix
 log_pred <- ifelse(log_prob > cut_log, "Yes", "No") %>%
   factor(levels = c("No", "Yes"))
 
 cm_log <- confusionMatrix(log_pred, test_data$continued_after_campaign)
-cm_log
 
 # 7. Random Forest -----------------------------------------------------------
 
-# Vi sikrer reproducerbarhed
 set.seed(47)
 
-# Cross validation 
 rf_cv <- train(
   continued_after_campaign ~ .,
   data = train_data,
@@ -165,9 +140,6 @@ rf_cv <- train(
   tuneLength = 5
 )
 
-rf_cv
-
-# Vi laver vores Random Forest model
 rf_model <- randomForest(
   continued_after_campaign ~ .,
   data = train_data,
@@ -176,93 +148,178 @@ rf_model <- randomForest(
   importance = TRUE
 )
 
-# Prediction - Vi forudsiger sandsynligheder for vores testdatasæt
 rf_prob <- predict(rf_model, test_data, type = "prob")[,2]
 
-# Vi bereger ROC-kurven og finder det optimale cutoff
 roc_rf <- roc(test_data$continued_after_campaign, rf_prob)
 cut_rf <- as.numeric(coords(roc_rf, "best", ret = "threshold"))
 
-# Klassifikation
 rf_pred <- ifelse(rf_prob > cut_rf, "Yes", "No") %>%
   factor(levels = c("No", "Yes"))
 
-# # Vi laver vores Confusion Matrix
 cm_rf <- confusionMatrix(rf_pred, test_data$continued_after_campaign)
-cm_rf
-
-levels(rf_pred)
-levels(test_data$continued_after_campaign)
-
 
 # 8. XGBoost-----------------------------------------------------------------
 
-# Vi laver en samlet model.matrix for hele datasættet
 full_matrix <- model.matrix(continued_after_campaign ~ . - 1, data = model_data)
 
-# Vi konverterer target til numerisk
-full_label <- as.numeric(model_data$continued_after_campaign) - 1
-
-# Split i train/test
 train_matrix <- full_matrix[train_index, ]
 test_matrix  <- full_matrix[-train_index, ]
 
-# Brug den originale factor-target til CV
 y_train <- model_data$continued_after_campaign[train_index]
 
-# DMatrix til XGBoost-modellen
-dtrain <- xgb.DMatrix(data = train_matrix,
-                      label = as.numeric(y_train) - 1)
-dtest  <- xgb.DMatrix(data = test_matrix,
-                      label = as.numeric(model_data$continued_after_campaign[-train_index]) - 1)
+dtrain <- xgb.DMatrix(data = train_matrix, label = as.numeric(y_train) - 1)
+dtest  <- xgb.DMatrix(data = test_matrix,  label = as.numeric(model_data$continued_after_campaign[-train_index]) - 1)
 
-# Vi sikrer reproducerbarhed
 set.seed(47)
 
-# Cross validation
 xgb_cv2 <- xgb.cv(
   data = dtrain,
   nrounds = 300,
-  max_depth = 4,
-  eta = 0.05,
-  subsample = 0.8,
-  colsample_bytree = 0.8,
-  objective = "binary:logistic",
-  eval_metric = "auc",
+  params = list(
+    max_depth = 4,
+    eta = 0.05,
+    subsample = 0.8,
+    colsample_bytree = 0.8,
+    objective = "binary:logistic",
+    eval_metric = "auc"
+  ),
   nfold = 5,
   verbose = 0
 )
 
-xgb_cv2
-
-# Vi træner vores XGBoost-model
 xgb_model <- xgb.train(
   data = dtrain,
   nrounds = 300,
-  max_depth = 4,
-  eta = 0.05,
-  subsample = 0.8,
-  colsample_bytree = 0.8,
-  objective = "binary:logistic",
-  eval_metric = "auc"
+  params = list(
+    max_depth = 4,
+    eta = 0.05,
+    subsample = 0.8,
+    colsample_bytree = 0.8,
+    objective = "binary:logistic",
+    eval_metric = "auc"
+  )
 )
 
-# Prediction 
 xgb_prob <- predict(xgb_model, dtest)
 
-# ROC og cutoff
 roc_xgb <- roc(test_data$continued_after_campaign, xgb_prob)
 cut_xgb <- as.numeric(coords(roc_xgb, "best", ret = "threshold"))
 
-# Klassifikation
 xgb_pred <- ifelse(xgb_prob > cut_xgb, "Yes", "No") %>%
   factor(levels = c("No", "Yes"))
 
-# Vi laver vores Confusion Matrix
 cm_xgb <- confusionMatrix(xgb_pred, test_data$continued_after_campaign)
-cm_xgb
 
-# 9. AUC-sammenligning -------------------------------------------------------
+# 9. Tabel over mest risikable kunder -------------------------------------
+
+risk_list <- tibble(
+  pseudo_id = test_ids,
+  churn_probability = xgb_prob,
+  predicted_class = xgb_pred
+)
+
+risk_list_sorted <- risk_list %>%
+  arrange(desc(churn_probability))
+
+head(risk_list_sorted, 50)
+
+risk_table <- risk_list_sorted %>%
+  mutate(
+    churn_risk_pct = round(churn_probability * 100, 1),
+    risk_group = case_when(
+      churn_probability >= 0.75 ~ "Høj risiko",
+      churn_probability >= 0.50 ~ "Middel risiko",
+      TRUE ~ "Lav risiko"
+    )
+  ) %>%
+  select(
+    pseudo_id,
+    churn_risk_pct,
+    predicted_class,
+    risk_group
+  )
+
+head(risk_table, 50)
+view(risk_table)
+
+# 10. Økonomisk analyse af churn-kampagne -------------------------------------
+
+# Listepris efter kampagne 
+JP_pris <- 199  
+
+# Vi sætter et forventet retention uplift til 15% 
+retention_uplift_15percent <- 0.15  
+
+# Definition af højrisiko-kunder
+high_risk <- risk_list_sorted %>% 
+  filter(churn_probability > 0.75)
+
+n_high_risk <- nrow(high_risk)
+
+# Forventet antal reddede kunder
+saved_customers_15percent <- n_high_risk * retention_uplift_15percent
+
+# Scenarier for 3, 6 og 12 måneder
+value_3m_15percent  <- saved_customers_15percent * JP_pris * 3
+value_6m_15percent  <- saved_customers_15percent * JP_pris * 6
+value_12m_15percent <- saved_customers_15percent * JP_pris * 12
+
+# Samlet økonomitabel
+economy_table_15percent <- tibble(
+  periode = c("3 måneder", "6 måneder", "12 måneder"),
+  højrisiko_kunder = n_high_risk,
+  reddede_kunder = round(saved_customers_15percent),
+  besparelse_kr = round(c(value_3m_15percent, value_6m_15percent, value_12m_15percent))
+)
+
+economy_table_15percent
+
+# Vi laver også en med 5% (worst case scenario):
+retention_uplift_5percent <- 0.05  
+
+# Forventet antal reddede kunder
+saved_customers_5percent <- n_high_risk * retention_uplift_5percent
+
+# Scenarier for 3, 6 og 12 måneder
+value_3m_5percent  <- saved_customers_5percent * JP_pris * 3
+value_6m_5percent  <- saved_customers_5percent * JP_pris * 6
+value_12m_5percent <- saved_customers_5percent * JP_pris * 12
+
+# Samlet økonomitabel
+economy_table_5percent <- tibble(
+  periode = c("3 måneder", "6 måneder", "12 måneder"),
+  højrisiko_kunder = n_high_risk,
+  reddede_kunder = round(saved_customers_5percent),
+  besparelse_kr = round(c(value_3m_5percent, value_6m_5percent, value_12m_5percent))
+)
+
+economy_table_5percent
+
+# Vi laver også en med 25% (meget optimistisk):
+retention_uplift_25percent <- 0.25  
+
+# Forventet antal reddede kunder
+saved_customers_25percent <- n_high_risk * retention_uplift_25percent
+
+# Scenarier for 3, 6 og 12 måneder
+value_3m_25percent  <- saved_customers_25percent * JP_pris * 3
+value_6m_25percent  <- saved_customers_25percent * JP_pris * 6
+value_12m_25percent <- saved_customers_25percent * JP_pris * 12
+
+# Samlet økonomitabel
+economy_table_25percent <- tibble(
+  periode = c("3 måneder", "6 måneder", "12 måneder"),
+  højrisiko_kunder = n_high_risk,
+  reddede_kunder = round(saved_customers_25percent),
+  besparelse_kr = round(c(value_3m_25percent, value_6m_25percent, value_12m_25percent))
+)
+
+economy_table_25percent
+
+
+
+
+# 11. AUC-sammenligning -------------------------------------------------------
 
 auc_log <- as.numeric(pROC::auc(roc_log))
 auc_rf  <- as.numeric(pROC::auc(roc_rf))
@@ -303,7 +360,7 @@ legend("bottomright",
        col = c("steelblue", "darkgreen", "firebrick"),
        lwd = 2)
 
-# 10. Variabelvigtighed -------------------------------------------------------
+# 12. Variabelvigtighed -------------------------------------------------------
 
 # Random Forest: built-in importance
 # MeanDecreaseGini måler hvor meget hver variabel bidrager til
@@ -346,7 +403,7 @@ xgb_imp %>%
   theme_minimal()
 
 
-# 11. Cross validation sammenligning --------------------------------------
+# 13. Cross validation sammenligning --------------------------------------
 
 # Udtræk af CV-resultater fra logistisk regression (caret-pakken)
 log_cv_results <- log_cv$results %>%
@@ -383,7 +440,7 @@ print(cv_sammenligning)
 # 89,45%. Hvilket betyder, at det er den der generaliser bedst på nye ukendte 
 # data. 
 
-# 12. Konklusion til ML-model nr. 1 --------------------------------------------
+# 14. Konklusion til ML-model nr. 1 --------------------------------------------
 
 # Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
 # fortsætter efter kampagneperioden. Vi har brugt korrekt feature engineering og
@@ -395,7 +452,11 @@ print(cv_sammenligning)
 # churnerne og 85% af de kunder, der fortsætter, hvilket gør den velegnet til 
 # at understøtte JPs problemstillinger. 
 
-# 13. Gem som RDS-fil til Shiny App -------------------------------------------
+# 15. Gem som RDS-filer til Shiny App ------------------------------------------
 
 saveRDS(xgb_model, "xgb_model.rds")
+
+
+
+
 
