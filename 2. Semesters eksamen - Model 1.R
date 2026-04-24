@@ -53,7 +53,6 @@ model_data <- model_data %>%
 
 model_data <- model_data %>%
   mutate(
-    days_active_before_campaign = account_active_days,
     days_since_user_created = as.numeric(order_date - usr_created),
     days_between_signup_and_order = as.numeric(order_date - usr_created),
     days_to_cancel = as.numeric(subscription_cancel_date - order_date),
@@ -527,7 +526,7 @@ xgb_imp %>%
 log_cv_results <- log_cv$results %>%
   select(ROC, Sens, Spec) %>%
   slice(which.max(ROC)) %>%
-  mutate
+  mutate(Model = "Logistisk regression")
 # log_cv$results indeholder alle CV‑kombinationer fra caret.
 # select(ROC, Sens, Spec) henter de metrics vi vil sammenligne.
 # slice(which.max(ROC)) vælger den række (tuning‑kombination) med højeste ROC.
@@ -585,9 +584,3 @@ saveRDS(xgb_model, "xgb_model.rds")
 write.csv(risk_list, "risiko_liste.csv", row.names = FALSE)
 write.csv(economy_table, "økonomisk_besparelse.csv", row.names = FALSE)
 write.csv(xgb_imp, "xgb_variabel_vigtighed.csv", row.names = FALSE)
-
-
-
-
-
-
