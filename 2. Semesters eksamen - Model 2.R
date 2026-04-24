@@ -55,7 +55,7 @@ model2_data <- model2_data %>%
     previous_subscriptions,
     previous_campaigns,
     previous_trials,
-    account_active_days,
+    account_active_days_before_campaign,
     
     # Permission og nyhedsbreve
     permission_given_order,
@@ -180,7 +180,9 @@ cm_rf2
 # 8. XGBoost ---------------------------------------------------
 
 # Vi laver en samlet model.matrix for hele datasættet
+# Tilføj dette lige efter full_matrix2 er lavet
 full_matrix2 <- model.matrix(churn_10 ~ . - 1, data = model2_data)
+colnames(full_matrix2)  # tjek at navnene er der
 
 # Vi konverterer target til numerisk
 full_label2  <- as.numeric(model2_data$churn_10) - 1
@@ -371,15 +373,13 @@ print(cv_sammenligning2)
 # kunder der fortsætter efter kampagneperioden. Modellen identificerer kunder
 # der churner inden for 10 dage efter kampagnens afslutning — typisk kunder
 # der glemte at afmelde og reagerer når de ser første betaling.
-# XGBoost er den bedste model med AUC = 0.784 og en god balance mellem
-# sensitivity (77.5%) og specificity (71.4%), hvilket gør den velegnet til
+# XGBoost er den bedste model med AUC = 0.779 og en god balance mellem
+# sensitivity (79.1%) og specificity (71.4%), hvilket gør den velegnet til
 # at identificere risikokunder.
-# Random Forest har lavere AUC (0.780) og dårlig specificity (52.4%),
-# hvilket betyder den misser mange churn-kandidater.
-# Logistisk regression er ikke egnet med AUC på 0.694.
-# Den vigtigste forklarende variabel er account_active_days — kunder med
+# Random Forest har lavere AUC (0.767) og lignende specificity (71.4%).
+# Logistisk regression er ikke egnet med AUC på 0.677.
+# Den vigtigste forklarende variabel er account_active_days_before_campaign — kunder med
 # lang historik hos JP churner markant sjældnere end nye kunder.
 
-# 13. Gem som RDS-fil til Shiny App ------------------------------------------
 
-saveRDS(xgb_model2, "churn_app/xgb_model2.rds")
+
