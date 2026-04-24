@@ -117,7 +117,7 @@ sub_cancel <- sub_cancel %>%
   )
 
 
-# 7. Lav churn-variabler til modeller ----------------------------------------
+# 7. Lav variabler til modeller ----------------------------------------
 
 sub_cancel <- sub_cancel %>%
   mutate(
@@ -139,7 +139,9 @@ sub_cancel <- sub_cancel %>%
         !is.na(subscription_cancel_date) &
         as.numeric(subscription_cancel_date - last_campaign_day) <= 10,
       1, 0
-    )
+    ),
+    account_active_days_before_campaign = account_active_days -
+      as.numeric(last_campaign_day - as.Date(order_date))
   )
 
 
