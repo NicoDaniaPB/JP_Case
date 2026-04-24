@@ -77,6 +77,7 @@ model_data <- model_data %>%
 
 model_data <- model_data %>%
   select(
+    -account_active_days 
     -subscription_cancel_date,
     -days_to_cancel,
     -end_date,
