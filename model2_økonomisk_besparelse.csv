@@ -1,0 +1,4 @@
+"scenario","højrisiko_kunder","reddede_kunder","besparelse_3m","besparelse_6m","besparelse_12m"
+"5% (Worst case)",7,0,209,418,836
+"15% (Realistisk)",7,1,627,1254,2507
+"25% (Optimistisk)",7,2,1045,2090,4179

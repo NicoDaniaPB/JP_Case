@@ -77,7 +77,6 @@ model_data <- model_data %>%
 
 model_data <- model_data %>%
   select(
-    -account_active_days 
     -subscription_cancel_date,
     -days_to_cancel,
     -end_date,
@@ -564,19 +563,19 @@ cv_sammenligning <- bind_rows(
 print(cv_sammenligning)
 
 # Vi kan se, at XGboost modellen opnår den højeste cross validation ROC på 
-# 87.36%. Hvilket betyder, at det er den der generaliser bedst på nye ukendte 
-# data. 
+# 87.28%. Hvilket betyder, at det er den der generaliser bedst på nye ukendte 
+# data. Random Forest performer også meget godt, men en CV-ROC på 87.12%. 
 
 # 14. Konklusion til ML-model nr. 1 --------------------------------------------
 
 # Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
 # fortsætter efter kampagneperioden. Vi har brugt korrekt feature engineering og
 # fjernet dataleakage, og lavet tre forskellige klassifikationsmodeller. XGBoost
-# modellen opnår den højeste AUC på 89.7%. og dermed den bedste balance mellem 
-# sensitivity og specificity, hvor den finder 89.7% true-positives. Det er 
+# modellen opnår den højeste AUC på 90.1%. og dermed den bedste balance mellem 
+# sensitivity og specificity, hvor den finder 90.1% true-positives. Det er 
 # derfor den bedste model til at forudsige churn efter kampagnen. 
-# XGBoost-model har en accuracy på 82.9%. Modellen identificerer 79.8% af 
-# churnerne og 86.0% af de kunder, der fortsætter, hvilket gør den velegnet til 
+# XGBoost-model har en accuracy på 82.5%. Modellen identificerer 90.4% af 
+# churnerne og 74.8% af de kunder, der fortsætter, hvilket gør den velegnet til 
 # at understøtte JPs problemstillinger. 
 
 # 15. Gem som CSV-filer til Power BI ------------------------------------------

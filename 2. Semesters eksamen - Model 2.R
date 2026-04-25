@@ -252,7 +252,13 @@ xgb_pred2 <- ifelse(xgb_prob2 > cut_xgb2, "Yes", "No") %>%
 cm_xgb2 <- confusionMatrix(xgb_pred2, test_data2$churn_10)
 cm_xgb2
 
-# 9. AUC-sammenligning -------------------------------------------------------
+
+# 9. Tabel over risikable kunder ------------------------------------------
+
+# 10. Økonomisk analyse af churn-kampagne ---------------------------------
+
+
+# 11. AUC-sammenligning -------------------------------------------------------
 
 auc_log2 <- as.numeric(pROC::auc(roc_log2))
 auc_rf2  <- as.numeric(pROC::auc(roc_rf2))
@@ -293,7 +299,7 @@ legend("bottomright",
        col = c("steelblue", "darkgreen", "firebrick"),
        lwd = 2)
 
-# 10. Variabelvigtighed -------------------------------------------------------
+# 12. Variabelvigtighed -------------------------------------------------------
 
 # Random Forest: built-in importance
 # MeanDecreaseGini måler hvor meget hver variabel bidrager til
@@ -335,7 +341,7 @@ xgb_imp2 %>%
   ) +
   theme_minimal()
 
-# 11. Cross validation sammenligning -----------------------------------------
+# 13. Cross validation sammenligning -----------------------------------------
 
 # Udtræk af CV-resultater fra logistisk regression (caret-pakken)
 log_cv2_results <- log_cv2$results %>%
@@ -367,19 +373,21 @@ cv_sammenligning2 <- bind_rows(
 
 print(cv_sammenligning2)
 
-# 12. Konklusion til model nr. 2 -------------------------------------------
+# 14. Konklusion til model nr. 2 -------------------------------------------
 
 # Vi har udviklet en klassifikationsmodel til at forudsige churn_10 blandt
 # kunder der fortsætter efter kampagneperioden. Modellen identificerer kunder
 # der churner inden for 10 dage efter kampagnens afslutning — typisk kunder
 # der glemte at afmelde og reagerer når de ser første betaling.
-# XGBoost er den bedste model med AUC = 0.779 og en god balance mellem
-# sensitivity (79.1%) og specificity (71.4%), hvilket gør den velegnet til
+# XGBoost er den bedste model med AUC = 0.78 og en god balance mellem
+# sensitivity (77.5%) og specificity (71.4%), hvilket gør den velegnet til
 # at identificere risikokunder.
-# Random Forest har lavere AUC (0.767) og lignende specificity (71.4%).
-# Logistisk regression er ikke egnet med AUC på 0.677.
-# Den vigtigste forklarende variabel er account_active_days_before_campaign — kunder med
-# lang historik hos JP churner markant sjældnere end nye kunder.
+# Random Forest har lavere AUC (0.769) og lignende specificity (61.9%), men 
+# højere sensitivity på 84.5%. Denne ubaalance gør den uegnet til JP's 
+# problemstilling. Logistisk regression er ikke egnet med AUC på 0.677.
+# Den vigtigste forklarende variabel er 
+# account_active_days_before_campaign — kunder med lang historik hos JP 
+# churner markant sjældnere end nye kunder.
 
 
 
