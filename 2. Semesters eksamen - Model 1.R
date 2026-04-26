@@ -92,7 +92,8 @@ model_data <- model_data %>%
     -first_campaign_day,
     -last_campaign_day,
     -days_between_signup_and_order,
-    -account_active_days
+    -account_active_days,
+    churn_10
   )
 
 # Vi har nu brugt pipe-operatoren til at bygge ovenpå "model_data". Vi har brugt
