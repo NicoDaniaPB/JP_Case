@@ -15,11 +15,17 @@ pacman::p_load(tidyverse, lubridate, caret, pROC, randomForest, xgboost)
 # 1. Indlæsning af data ---------------------------------------
 model_data <- read_rds("data/renset_datasæt.rds")
 
+# Vi gemmer ID'er separat
+all_ids <- model_data$pseudo_id
+
 # 2. Yderligere klargøring af data til modellerne -------------------------
 
 # Filtrering til kunder der FORTSÆTTER efter kampagnen
 model2_data <- model_data %>%
   filter(continued_after_campaign == 1)
+
+# Vi gemmer ID'er for Model 2 datasættet
+model2_ids <- model2_data$pseudo_id
 
 # Target-variabel: churn_10
 # Vi konverterer til factor med gyldige labels til caret
@@ -255,8 +261,90 @@ cm_xgb2
 
 # 9. Tabel over risikable kunder ------------------------------------------
 
+# Gem ID'er datasættene
+train_ids <- model2_ids[train_index2]
+test_ids  <- model2_ids[-train_index2]
+
+# Lav risk-listen med de rigtige variabler
+risk_list <- tibble(
+  pseudo_id = test_ids,
+  churn_probability = xgb_prob2,
+  predicted_class = xgb_pred2
+)
+
+# Sortér efter risiko
+risk_list_sorted <- risk_list %>%
+  arrange(desc(churn_probability))
+
+# Lav endelig tabel
+risk_table <- risk_list_sorted %>%
+  mutate(
+    churn_risk_pct = round(churn_probability * 100, 1),
+    risk_group = case_when(
+      churn_probability >= 0.75 ~ "Høj risiko",
+      churn_probability >= 0.50 ~ "Middel risiko",
+      TRUE ~ "Lav risiko"
+    )
+  ) %>%
+  select(
+    pseudo_id,
+    churn_risk_pct,
+    predicted_class,
+    risk_group
+  )
+
+# Se resultat
+head(risk_table, 50)
+
 # 10. Økonomisk analyse af churn-kampagne ---------------------------------
 
+# Vi laver nu en økonomisk beregning af værdien ved at redde høj-risiko-kunder
+# og vi gør det for tre forskellige scenarier. 
+
+# Listepris efter kampagne 
+JP_pris <- 199  
+
+# Definition af højrisiko-kunder
+high_risk <- risk_list_sorted %>% 
+  filter(churn_probability > 0.75)
+n_high_risk <- nrow(high_risk)
+# Vi filtrerer kunder med en churn-sandsynlighed over 75%.
+# n_high_risk = antal højrisiko-kunder. 
+
+# 5% uplift
+uplift_5 <- 0.05
+saved_5 <- n_high_risk * uplift_5
+value_3m_5  <- saved_5 * JP_pris * 3
+value_6m_5  <- saved_5 * JP_pris * 6
+value_12m_5 <- saved_5 * JP_pris * 12
+
+# 15% uplift
+uplift_15 <- 0.15
+saved_15 <- n_high_risk * uplift_15
+value_3m_15  <- saved_15 * JP_pris * 3
+value_6m_15  <- saved_15 * JP_pris * 6
+value_12m_15 <- saved_15 * JP_pris * 12
+
+# 25% uplift
+uplift_25 <- 0.25
+saved_25 <- n_high_risk * uplift_25
+value_3m_25  <- saved_25 * JP_pris * 3
+value_6m_25  <- saved_25 * JP_pris * 6
+value_12m_25 <- saved_25 * JP_pris * 12
+
+# Samlet tabel
+economy_table <- tibble(
+  scenario = c("5% (Worst case)", "15% (Realistisk)", "25% (Optimistisk)"),
+  højrisiko_kunder = n_high_risk,
+  reddede_kunder = round(c(saved_5, saved_15, saved_25)),
+  besparelse_3m = round(c(value_3m_5, value_3m_15, value_3m_25)),
+  besparelse_6m = round(c(value_6m_5, value_6m_15, value_6m_25)),
+  besparelse_12m = round(c(value_12m_5, value_12m_15, value_12m_25))
+)
+# Vi har nu samlet resultaterne i en tibble ved combine (c) funktionen. 
+
+# Vi ser resultaterne
+economy_table
 
 # 11. AUC-sammenligning -------------------------------------------------------
 
@@ -389,5 +477,10 @@ print(cv_sammenligning2)
 # account_active_days_before_campaign — kunder med lang historik hos JP 
 # churner markant sjældnere end nye kunder.
 
+# 15. Gem filer til Power BI ----------------------------------------------
+
+write.csv(risk_list, "model2_risiko_liste.csv", row.names = FALSE)
+write.csv(economy_table, "model2_økonomisk_besparelse.csv", row.names = FALSE)
+write.csv(xgb_imp, "model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
 
 
