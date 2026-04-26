@@ -598,3 +598,9 @@ xgb_imp %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   write.table("data/xgb_variabel_vigtighed.csv",
               sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+
+# Eksporter alle kunder med continued_after_campaign til Power BI
+model_data_raw %>%
+  select(pseudo_id, continued_after_campaign, koen, age, age_group) %>%
+  write.table("data/kampagne_oversigt.csv",
+              sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
