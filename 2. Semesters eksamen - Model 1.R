@@ -91,7 +91,9 @@ model_data <- model_data %>%
     -birthdate,
     -first_campaign_day,
     -last_campaign_day,
-    -days_between_signup_and_order
+    -days_between_signup_and_order,
+    -account_active_days,
+    -churn_10
   )
 
 # Vi har nu brugt pipe-operatoren til at bygge ovenpå "model_data". Vi har brugt
@@ -580,7 +582,25 @@ print(cv_sammenligning)
 
 # 15. Gem som CSV-filer til Power BI ------------------------------------------
 
-saveRDS(xgb_model, "xgb_model.rds")
-write.csv(risk_list, "risiko_liste.csv", row.names = FALSE)
-write.csv(economy_table, "økonomisk_besparelse.csv", row.names = FALSE)
-write.csv(xgb_imp, "xgb_variabel_vigtighed.csv", row.names = FALSE)
+saveRDS(xgb_model, "data/xgb_model.rds")
+
+# Risiko liste
+risk_list %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/risiko_liste.csv",
+              sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+
+# Økonomisk besparelse
+write.csv(economy_table, "data/økonomisk_besparelse.csv", row.names = FALSE)
+
+# Variabelvigtighed
+xgb_imp %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/xgb_variabel_vigtighed.csv",
+              sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+
+# Eksporter alle kunder med continued_after_campaign til Power BI
+model_data_raw %>%
+  select(pseudo_id, continued_after_campaign, koen, age, age_group) %>%
+  write.table("data/kampagne_oversigt.csv",
+              sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
