@@ -104,6 +104,8 @@ sub_cancel <- sub_cancel %>%
 # 6. Tilføj alder + aldersgrupper -------------------------------------------
 
 sub_cancel <- sub_cancel %>%
+  filter(!is.na(birthdate)) %>%
+  filter(as.numeric(difftime(as.Date(order_date), birthdate, units = "days")) / 365 >= 18) %>%
   mutate(
     age = floor(time_length(interval(birthdate, today()), "years")),
     age_group = case_when(
@@ -175,11 +177,12 @@ full_data <- sub_cancel %>%
     )
   )
 
-# 9. Fjern kunde med ugyldig fødselsdato -------------------------------------------------
+# 9. Gem det rensede datasæt -------------------------------------------------
 
-full_data <- full_data %>%
-  filter(!is.na(birthdate))
-
-# 10. Gem det rensede datasæt -------------------------------------------------
-
-saveRDS(full_data, "data/renset_datasæt.rds")
+saveRDS(full_data, "churn_app/renset_datasæt.rds")
+full_data %>%
+  mutate(across(where(is.Date), ~ as.character(.x))) %>%
+  mutate(across(everything(), ~ ifelse(is.na(.x), "", .x))) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/renset_data.csv",
+              sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
