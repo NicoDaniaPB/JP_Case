@@ -15,7 +15,7 @@ model_data_raw <- read_rds("data/renset_datasæt.rds")
 # kampagnen. 
 
 # Datoformatering
-model_data <- model_data %>%
+model_data <- model_data_raw %>%
   mutate(
     order_date = as.Date(order_date),
     usr_created = as.Date(usr_created),
@@ -91,9 +91,10 @@ model_data <- model_data %>%
     -birthdate,
     -first_campaign_day,
     -last_campaign_day,
-    -days_between_signup_and_order,
     -account_active_days,
-    -churn_10
+    -churn_10,
+    -order_trackertag,  
+    -reason    
   )
 
 # Vi har nu brugt pipe-operatoren til at bygge ovenpå "model_data". Vi har brugt
