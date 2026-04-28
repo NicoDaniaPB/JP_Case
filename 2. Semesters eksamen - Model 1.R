@@ -67,6 +67,7 @@ model_data <- model_data %>%
   ) %>%
   drop_na()
 
+
 # Vi har nu brugt mutate-funktionen til at bygge videre på "model_data", vi har
 # bygget features, som kan forbedre modellens prediktionsevne. 
 
@@ -118,7 +119,31 @@ test_data  <- model_data[-train_index, ]
 # Vi splitter pseudo_ids så det er med i test-dataene
 test_ids <- pseudo_ids[-train_index]
 
-# 6. Logistisk regression ----------------------------------------------------
+
+# 6. Håndtering korrelerede variabler ----------------------------------------
+
+# Tjek for perfekt korrelerede variabler
+cor_matrix <- cor(train_data %>% select(where(is.numeric)))
+high_cor <- which(abs(cor_matrix) > 0.95 & cor_matrix != 1, arr.ind = TRUE)
+print(high_cor)
+
+# Tjek for lineær afhængighed
+findLinearCombos(train_data %>% select(where(is.numeric)))
+
+# Tjek hvilke variabler der er i train_data
+colnames(train_data)
+
+# Vi fjerner de korrelerede variabler
+num_vars <- train_data %>% select(where(is.numeric))
+
+vars_to_remove <- colnames(num_vars)[c(16, 19, 21)]
+
+train_data <- train_data %>% select(-all_of(vars_to_remove))
+test_data  <- test_data %>% select(-all_of(vars_to_remove))
+
+         
+
+# 7. Logistisk regression ----------------------------------------------------
 
 # Vi sikrer reproducerbarhed
 set.seed(47)
@@ -181,7 +206,7 @@ log_pred <- ifelse(log_prob > cut_log, "Yes", "No") %>%
 cm_log <- confusionMatrix(log_pred, test_data$continued_after_campaign)
 # Dette giver os vores møgletal, som skal bruges til at vurdere modellen. 
 
-# 7. Random Forest -----------------------------------------------------------
+# 8. Random Forest -----------------------------------------------------------
 
 # Vi sikrer reproducerbarhed 
 set.seed(47)
@@ -237,7 +262,7 @@ rf_pred <- ifelse(rf_prob > cut_rf, "Yes", "No") %>%
 cm_rf <- confusionMatrix(rf_pred, test_data$continued_after_campaign)
 # Dette giver vores nøgletal.
 
-# 8. XGBoost-----------------------------------------------------------------
+# 9. XGBoost-----------------------------------------------------------------
 
 # Vi laver vores model matrix
 full_matrix <- model.matrix(continued_after_campaign ~ . - 1, data = model_data)
@@ -324,7 +349,7 @@ xgb_pred <- ifelse(xgb_prob > cut_xgb, "Yes", "No") %>%
 cm_xgb <- confusionMatrix(xgb_pred, test_data$continued_after_campaign)
 # Dette giver vores nøgletal
 
-# 9. Tabel over mest risikable kunder -------------------------------------
+# 10. Tabel over mest risikable kunder -------------------------------------
 
 # BEMÆRK: der 211, fordi det er test_dataene vi har gemt pseudo_ids i. 
 # Vi opretter en tabel med ID, sandsynlighed og forudsagt klasse
@@ -365,7 +390,7 @@ risk_table <- risk_list_sorted %>%
 head(risk_table, 50)
 view(risk_table)
 
-# 10. Økonomisk analyse af churn-kampagne -------------------------------------
+# 11. Økonomisk analyse af churn-kampagne -------------------------------------
 
 # Vi laver nu en økonomisk beregning af værdien ved at redde høj-risiko-kunder
 # og vi gør det for tre forskellige scenarier. 
@@ -416,7 +441,7 @@ economy_table <- tibble(
 # Vi ser resultaterne
 economy_table
 
-# 11. AUC-sammenligning -------------------------------------------------------
+# 12. AUC-sammenligning -------------------------------------------------------
 
 # Vi beregner AUC for alle modeller 
 auc_log <- as.numeric(pROC::auc(roc_log))
@@ -471,7 +496,7 @@ legend("bottomright",
 # Vi tilføjer legend, hvilket viser modelnavne + AUC direkte i figuren. 
 # Farverne matcher kurverne. lwd = 2 giver tykkere linjer. 
 
-# 12. Variabelvigtighed -------------------------------------------------------
+# 13. Variabelvigtighed -------------------------------------------------------
 
 # Random Forest: built-in importance
 # MeanDecreaseGini måler hvor meget hver variabel bidrager til
@@ -524,7 +549,7 @@ xgb_imp %>%
   theme_minimal()
 # Dette viser de 15 vigtigste variabler for XGBoost.
 
-# 13. Cross validation sammenligning --------------------------------------
+# 14. Cross validation sammenligning --------------------------------------
 
 # Udtræk af CV-resultater fra logistisk regression via caret-pakken
 log_cv_results <- log_cv$results %>%
@@ -570,7 +595,7 @@ print(cv_sammenligning)
 # 87.28%. Hvilket betyder, at det er den der generaliser bedst på nye ukendte 
 # data. Random Forest performer også meget godt, men en CV-ROC på 87.12%. 
 
-# 14. Konklusion til ML-model nr. 1 --------------------------------------------
+# 15. Konklusion til ML-model nr. 1 --------------------------------------------
 
 # Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
 # fortsætter efter kampagneperioden. Vi har brugt korrekt feature engineering og
@@ -582,7 +607,7 @@ print(cv_sammenligning)
 # churnerne og 74.8% af de kunder, der fortsætter, hvilket gør den velegnet til 
 # at understøtte JPs problemstillinger. 
 
-# 15. Gem som CSV-filer til Power BI ------------------------------------------
+# 16. Gem som CSV-filer til Power BI ------------------------------------------
 
 saveRDS(xgb_model, "data/xgb_model.rds")
 
