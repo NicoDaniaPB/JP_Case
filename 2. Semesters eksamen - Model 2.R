@@ -13,19 +13,28 @@ pacman::p_load(tidyverse, lubridate, caret, pROC, randomForest, xgboost)
 # afmelde inden for de første 10 dage efter kampagnens afslutning.
 
 # 1. Indlæsning af data ---------------------------------------
+
+# Vi indlæser dataene ved "read_rds"-funktionen
 model_data <- read_rds("data/renset_datasæt.rds")
 
 # Vi gemmer ID'er separat
 all_ids <- model_data$pseudo_id
+# Vi gør dette, så vi kan lave risiko-liste senere i koden. 
 
 # 2. Yderligere klargøring af data til modellerne -------------------------
 
 # Filtrering til kunder der FORTSÆTTER efter kampagnen
 model2_data <- model_data %>%
   filter(continued_after_campaign == 1)
+# Vi har filtereret dataene, så vi kun har de kunder med der forsætter efter 
+# kampagnen. Vi bruger pipeline operatoren til at bygge videre på "model_data"
+# til at filtrere hvor "continued_after_campaign" er = 1. Dvs kun de kunder, 
+# der forsætter efter kampagnen. 
 
 # Vi gemmer ID'er for Model 2 datasættet
 model2_ids <- model2_data$pseudo_id
+# Vi tager "pseudo_id" fra "model2_data" og gemmer det i en separat vektor vi 
+# kalder "model2_ids".
 
 # Target-variabel: churn_10
 # Vi konverterer til factor med gyldige labels til caret
@@ -37,6 +46,9 @@ model2_data <- model2_data %>%
       labels = c("No", "Yes")
     )
   )
+# Vi bruger pipeline-operatoren til at bygge videre på "model2_data". Vi bruger
+# mutate til at konverterer "churn_10" til en factor med niveauerne 0 og 1. 
+# Dvs. churner eller ikke-churner. 
 
 # 3. Feature engineering --------------------------------------------------
 
@@ -49,6 +61,8 @@ model2_data <- model2_data %>%
     total_previous_engagement = previous_subscriptions + previous_campaigns + previous_trials,
     has_previous_subscriptions = ifelse(previous_subscriptions > 0, 1, 0)
   )
+# Vi bruger pipeline-operatoren til at bygge videre på "model2_data". Vi bruger
+# mutate til at bygge nogle features, som skal styrke modellens forklaringsgrad. 
 
 # 4. Udvælgelse af variabler ------------------------------------------
 model2_data <- model2_data %>%
@@ -115,6 +129,14 @@ cv_ctrl2 <- trainControl(
   summaryFunction = twoClassSummary
 )
 
+# Vi definerer hvordan caret skal validere modellen:
+# method = "cv" → almindelig k‑fold cross‑validation
+# number = 5 → 5 fold
+# classProbs = TRUE → caret skal beregne sandsynligheder (ikke kun klasser)
+# summaryFunction = twoClassSummary → caret skal optimere efter:
+# ROC, sensitivitet og specificitet
+# Dette kræver at target‑variablen er en factor med levels: "No" og "Yes".
+
 log_cv2 <- train(
   churn_10 ~ .,
   data = train_data2,
@@ -123,24 +145,47 @@ log_cv2 <- train(
   trControl = cv_ctrl2,
   metric = "ROC"
 )
+# caret træner en logistisk regression (glm)
+# alle variabler bruges som features (~ .)
+# cross‑validation styres af cv_ctrl2
+# modellen optimeres efter ROC
+# log_cv2 indeholder:
+# CV‑ROC, CV‑sensitivitet og CV‑specificitet, koefficienter og performance på
+# tværs af fold.
 
+# Vi ser resultatet
 log_cv2
 
 # Vi træner en logistisk regressionsmodel på alle vores variabler
 log_model2 <- glm(churn_10 ~ ., data = train_data2, family = binomial)
+# Vi træner her en klassisk logistisk regression uden cross‑validation.
+# Grunden til vi gør begge dele er følgende: 
+# caret‑modellen bruges til performance‑estimat og glm‑modellen bruges til 
+# prediction og ROC‑analyse på testdata.
 
 # Prediction - Vi forudsiger sandsynligheder for vores testdatasæt
 log_prob2 <- predict(log_model2, test_data2, type = "response")
+# modellen forudsiger sandsynligheder for churn, og output er tal mellem 0 og 1.
 
 # Vi bereger ROC-kurven og finder det optimale cutoff
 roc_log2 <- roc(test_data2$churn_10, log_prob2)
 cut_log2 <- as.numeric(coords(roc_log2, "best", ret = "threshold"))
+# roc() beregner ROC‑kurven
+# coords(..., "best") finder det cutoff der maksimerer Youden’s J, hvilket er:
+# = sensitivitet + specificitet – 1. Det giver os det optimale threshold i 
+# stedet for standard 0.5.
 
 # Vi konverterer sandsynlighederne til klasser og beregner confusion matrix
 log_pred2 <- ifelse(log_prob2 > cut_log2, "Yes", "No") %>%
   factor(levels = c("No", "Yes"))
 cm_log2 <- confusionMatrix(log_pred2, test_data2$churn_10)
 cm_log2
+
+# Sandsynligheder → klasser:
+# cutoff → "Yes" (churn)
+# ellers → "No"
+# Vi konverterer til factor med korrekt rækkefølge, caret kræver at "No" er
+# første level. confusionMatrix() beregner vores nøgletal.
 
 # 7. Random Forest --------------------------------------------
 
@@ -156,7 +201,16 @@ rf_cv2 <- train(
   metric = "ROC",
   tuneLength = 5
 )
+# caret træner en Random Forest‑model
+# ~ . betyder: brug alle features
+# method = "rf" → caret bruger randomForest‑pakken
+# trControl = cv_ctrl2 → 5‑fold cross‑validation
+# metric = "ROC" → caret optimerer efter ROC‑score
+# tuneLength = 5 → caret tester 5 forskellige værdier af mtry 
+# (antal variabler pr. split)
 
+
+# Vi ser resultatet: 
 rf_cv2
 
 # Vi laver vores Random Forest model
@@ -167,35 +221,63 @@ rf_model2 <- randomForest(
   mtry = floor(sqrt(ncol(train_data2) - 1)),
   importance = TRUE
 )
+# Du træner en Random Forest manuelt med:
+# ntree = 500 -> antal træer i skoven
+# mtry = sqrt(p) -> klassisk tommelfingerregel for klassifikation
+# importance = TRUE → modellen beregner variable importance
+# Hvorfor både caret og en manuel model?
+#   caret‑modellen bruges til cross‑validation performance
+# den manuelle model bruges til prediction og ROC‑analyse på testdata
 
 # Prediction - Vi forudsiger sandsynligheder for vores testdatasæt
 rf_prob2 <- predict(rf_model2, test_data2, type = "prob")[,2]
+# Random Forest forudsiger klasse‑sandsynligheder
+# [,2] henter sandsynligheden for klassen "Yes" (churn)
 
 # Vi bereger ROC-kurven og finder det optimale cutoff
 roc_rf2 <- roc(test_data2$churn_10, rf_prob2)
 cut_rf2 <- as.numeric(coords(roc_rf2, "best", ret = "threshold"))
+# ROC‑kurven beregnes, og det optimale cutoff findes ud fra Youden’s J:
+# max(sensitivitet + specificitet – 1)
+# Dette giver et bedre cutoff end standard 0.5.
 
 # Klassifikation
 rf_pred2 <- ifelse(rf_prob2 > cut_rf2, "Yes", "No") %>%
   factor(levels = c("No", "Yes"))
+# Sandsynligheder konverteres til klasser:
+# cutoff -> "Yes"
+# ellers -> "No"
+# Factor levels sættes korrekt (caret kræver "No" først)
 
 # Vi laver vores Confusion Matrix
 cm_rf2 <- confusionMatrix(rf_pred2, test_data2$churn_10)
 cm_rf2
+# Vi har nu en fuld evaluering af modellen. 
 
 # 8. XGBoost ---------------------------------------------------
 
 # Vi laver en samlet model.matrix for hele datasættet
 # Tilføj dette lige efter full_matrix2 er lavet
 full_matrix2 <- model.matrix(churn_10 ~ . - 1, data = model2_data)
-colnames(full_matrix2)  # tjek at navnene er der
+colnames(full_matrix2)  
+# model.matrix() konverterer alle features til numeriske kolonner, inkl. 
+# one‑hot encoding af faktorer.
+# -1 fjerner intercept‑kolonnen.
+# XGBoost kræver rene numeriske matricer, så dette er nødvendigt.
 
 # Vi konverterer target til numerisk
 full_label2  <- as.numeric(model2_data$churn_10) - 1
+# churn_10 er en factor med levels "No" og "Yes".
+# as.numeric() gør dem til 1 og 2.
+# -1 gør dem til 0 og 1 (som XGBoost kræver).
 
 # Vi splitter matrix og labels i train/test
 train_matrix2 <- full_matrix2[train_index2, ]
 test_matrix2  <- full_matrix2[-train_index2, ]
+# Du splitter både features og labels i train/test.
+# Du gemmer både:
+# numeriske labels (til XGBoost)
+# factor labels (til caret‑lignende funktioner).
 
 # Brug den originale factor-target til CV
 y_train2 <- model2_data$churn_10[train_index2]
@@ -203,10 +285,18 @@ y_train2 <- model2_data$churn_10[train_index2]
 train_label2 <- full_label2[train_index2]
 test_label2  <- full_label2[-train_index2]
 
+# Vi splitter både features og labels i train/test.
+# Vi gemmer både:
+# numeriske labels (til XGBoost)
+# factor labels (til caret‑lignende funktioner)
+
 # Vi laver en DMatrix
 dtrain2 <- xgb.DMatrix(data = train_matrix2, label = as.numeric(y_train2) - 1)
 dtest2  <- xgb.DMatrix(data = test_matrix2,
                        label = as.numeric(model2_data$churn_10[-train_index2]) - 1)
+# XGBoost bruger sin egen datastruktur: DMatrix.
+# Den er optimeret til hurtig træning og mindre hukommelsesforbrug.
+# Labels konverteres igen til 0/1.
 
 # Vi sikrer reproducerbarhed
 set.seed(47)
@@ -226,7 +316,21 @@ xgb_cv2 <- xgb.cv(
   nfold = 5,
   verbose = 0
 )
+# Vi kører 5‑fold cross‑validation med:
+# max_depth = 4 → hvor dybe træerne må være
+# eta = 0.05 → learning rate
+# subsample = 0.8 → hvor stor en del af data bruges pr. træ
+# colsample_bytree = 0.8 → hvor mange features bruges pr. træ
+# objective = "binary:logistic" → binær klassifikation
+# eval_metric = "auc" → optimer efter AUC
 
+# xgb.cv giver os:
+# AUC for hver fold
+# Gennemsnitlig AUC
+# Standardafvigelse
+# Overfitting‑indikatorer
+
+# Vi ser resultatet:
 xgb_cv2
 
 # Vi træner vores XGBoost-model
@@ -242,28 +346,43 @@ xgb_model2 <- xgb.train(
   data = dtrain2,
   nrounds = 300
 )
+# Vi træner en fuld XGBoost‑model på hele træningsdatasættet.
+# Parametrene er de samme som i CV.
+# nrounds = 300 betyder 300 boosting‑iterationer.
 
 # Prediction 
 xgb_prob2 <- predict(xgb_model2, dtest2)
+# XGBoost returnerer sandsynligheder for klassen "Yes".
 
 # ROC og cutoff
 roc_xgb2 <- roc(test_data2$churn_10, xgb_prob2)
 cut_xgb2 <- as.numeric(coords(roc_xgb2, "best", ret = "threshold"))
+# ROC‑kurven beregnes, og det optimale cutoff findes via Youden’s J:
+# max = (sensitivitet + specificitet – 1)
+# Dette giver et bedre cutoff end 0.5.
 
 # Klassifikation
 xgb_pred2 <- ifelse(xgb_prob2 > cut_xgb2, "Yes", "No") %>%
   factor(levels = c("No", "Yes"))
+# Sandsynligheder → klasser
+# Factor levels sættes korrekt (caret kræver "No" først)
 
 # Vi laver vores Confusion Matrix
 cm_xgb2 <- confusionMatrix(xgb_pred2, test_data2$churn_10)
 cm_xgb2
-
+# # Vi har nu en fuld evaluering af modellen. 
 
 # 9. Tabel over risikable kunder ------------------------------------------
 
 # Gem ID'er datasættene
 train_ids <- model2_ids[train_index2]
 test_ids  <- model2_ids[-train_index2]
+# Vi tager de pseudo‑ID’er, vi gemte tidligere (model2_ids)
+# Vi splitter dem i:
+# train_ids → ID’er i træningsdatasættet
+# test_ids → ID’er i testdatasættet
+# Det er fordi vi laver predictions på testdata, og vi skal kunne matche dem 
+# tilbage til de rigtige kunder.
 
 # Lav risk-listen med de rigtige variabler
 risk_list <- tibble(
@@ -271,10 +390,18 @@ risk_list <- tibble(
   churn_probability = xgb_prob2,
   predicted_class = xgb_pred2
 )
+# Vi bygger en tabel med:
+# pseudo_id → kundens ID.
+# churn_probability → sandsynlighed for churn (fra XGBoost).
+# predicted_class → "Yes" eller "No" baseret på cutoff.
+# Dette er den rå risikoliste.
 
 # Sortér efter risiko
 risk_list_sorted <- risk_list %>%
   arrange(desc(churn_probability))
+# Listen sorteres fra højeste til laveste churn‑sandsynlighed.
+# De mest risikofyldte kunder kommer øverst.
+# Dette er typisk det første retention‑teams vil se på.
 
 # Lav endelig tabel
 risk_table <- risk_list_sorted %>%
@@ -292,8 +419,13 @@ risk_table <- risk_list_sorted %>%
     predicted_class,
     risk_group
   )
+# Vi laver den endelige tabel, hvor vi laver tre risikogrupper:
+# Højere end 75% churn-risiko
+# Mellem 50% til 75% churn-risiko
+# Under 50% churn risiko
+# Vi vælger de relevante variabler vi vil have med. 
 
-# Se resultat
+# Se resultat for de første 50 rækker.
 head(risk_table, 50)
 
 # 10. Økonomisk analyse af churn-kampagne ---------------------------------
@@ -348,10 +480,16 @@ economy_table
 
 # 11. AUC-sammenligning -------------------------------------------------------
 
+# Vi beregner AUC for alle modeller
 auc_log2 <- as.numeric(pROC::auc(roc_log2))
 auc_rf2  <- as.numeric(pROC::auc(roc_rf2))
 auc_xgb2 <- as.numeric(pROC::auc(roc_xgb2))
+# Vi tager ROC‑objekterne for hver model.
+# Vi beregner deres AUC (Area Under the Curve).
+# Vi konverterer dem til numeriske værdier.
+# AUC er et mål for modellens evne til at skelne mellem churn og ikke‑churn.
 
+# Vi sammenligner modellerne ved at samle dem i en tibble
 model_sammenligning2 <- tibble(
   Model       = c("Logistisk regression", "Random Forest", "XGBoost"),
   AUC         = round(c(auc_log2, auc_rf2, auc_xgb2), 4),
@@ -371,9 +509,13 @@ model_sammenligning2 <- tibble(
     cm_xgb2$byClass["Specificity"]
   ), 4)
 )
+# Alle værdier hentes direkte fra confusion matrices og ROC‑objekter.
+# Dette giver os en fuld performance‑sammenligning.
 
+# Vi udskriver tabellen
 print(model_sammenligning2)
 
+# Vi plotter ROC-kurverne
 plot(roc_log2, col = "steelblue", lwd = 2,
      main = "ROC-kurver — Model 2 (churn_10 efter kampagneslut)")
 plot(roc_rf2,  col = "darkgreen", lwd = 2, add = TRUE)
@@ -386,6 +528,11 @@ legend("bottomright",
        ),
        col = c("steelblue", "darkgreen", "firebrick"),
        lwd = 2)
+# Først plottes ROC‑kurven for logistisk regression, derefter tilføjes 
+# Random Forest og XGBoost ovenpå. Farverne gør det nemt at skelne modellerne.
+# Dette giver et visuelt overblik over hvilken model der performer bedst.
+# Til sidst tilføjer vi en forklaringsboks nederst til højre, den viser: 
+# modelnavn, farve og AUC‑værdien. Dette gør grafen let at aflæse. 
 
 # 12. Variabelvigtighed -------------------------------------------------------
 
@@ -396,6 +543,13 @@ rf_imp2 <- importance(rf_model2) %>%
   as.data.frame() %>%
   rownames_to_column("variabel") %>%
   arrange(desc(MeanDecreaseGini))
+# importance(rf_model2) henter Random Forest’s indbyggede variabelvigtighed.
+# Random Forest bruger MeanDecreaseGini, som måler hvor meget en variabel 
+# reducerer usikkerhed (Gini impurity) på tværs af alle træer.
+# Vi konverterer resultatet til en data frame.
+# Vi tilføjer variabelnavne som en kolonne.
+# Vi sorterer variablerne efter vigtigst → mindst vigtig.
+# Dette giver os en rangeret liste over de mest betydningsfulde features.
 
 # Vi plotter de 15 vigtigste variabler
 rf_imp2 %>%
@@ -410,10 +564,18 @@ rf_imp2 %>%
     y = "MeanDecreaseGini"
   ) +
   theme_minimal()
+# Vi tager de 15 vigtigste variabler.
+# Vi laver et horisontalt søjlediagram.
+# Variablerne sorteres efter betydning.
+# Grafen viser visuelt hvilke features Random Forest bruger mest.
 
 # XGBoost: feature importance
 xgb_imp2 <- xgb.importance(model = xgb_model2) %>%
   as_tibble()
+# xgb.importance() henter XGBoost’s feature importance.
+# XGBoost bruger typisk Gain, som måler hvor meget en variabel forbedrer 
+# modellens præcision, når den bruges til splits. Vi konverterer resultatet til
+# en tibble.
 
 # Vi plotter de 15 vigtigste variabler
 xgb_imp2 %>%
@@ -428,6 +590,11 @@ xgb_imp2 %>%
     y = "Gain"
   ) +
   theme_minimal()
+# Vi tager de 15 vigtigste XGBoost‑features.
+# Vi laver et horisontalt søjlediagram.
+# Variablerne sorteres efter Gain.
+# Grafen viser hvilke features XGBoost finder mest informative.
+
 
 # 13. Cross validation sammenligning -----------------------------------------
 
@@ -436,12 +603,18 @@ log_cv2_results <- log_cv2$results %>%
   select(ROC, Sens, Spec) %>%
   slice(which.max(ROC)) %>%
   mutate(Model = "Logistisk regression")
+# log_cv2$results indeholder caret’s cross‑validation‑resultater for alle fold.
+# Vi vælger kun kolonnerne: ROC, Sens og Spec. 
+# slice(which.max(ROC)) vælger den række hvor ROC er højest.
+# Vi tilføjer en kolonne med modelnavnet.
+# Dette giver den bedste CV‑performance for logistisk regression.
 
 # Udtræk af CV-resultater fra Random Forest (caret-pakken)
 rf_cv2_results <- rf_cv2$results %>%
   select(ROC, Sens, Spec) %>%
   slice(which.max(ROC)) %>%
   mutate(Model = "Random Forest")
+# Der sker det samme som ved logistisk regression, bare for RF. 
 
 # Udtræk af CV-resultater fra XGBoost (xgb.cv)
 xgb_cv2_results <- tibble(
@@ -450,6 +623,11 @@ xgb_cv2_results <- tibble(
   Sens  = NA,   # xgb.cv giver ikke Sens/Spec direkte
   Spec  = NA
 )
+# Vi bruger XGBoost's egen indbygget cross-validation, og ikke caret-pakken, da 
+# det gav os problemer. 
+# XGBoost’s cross‑validation (xgb.cv) gemmer resultater i evaluation_log.
+# Vi  tager den højeste gennemsnitlige test‑AUC.
+# XGBoost giver ikke sensitivitet og specificitet i CV, så de sættes til NA.
 
 # Vi samler alle CV-resultater i en tabel
 cv_sammenligning2 <- bind_rows(
@@ -458,7 +636,11 @@ cv_sammenligning2 <- bind_rows(
   xgb_cv2_results
 ) %>%
   select(Model, ROC, Sens, Spec)
+# Vi binder de tre resultattabeller sammen.
+# Vi vælger kun de relevante kolonner.
+# Resultatet er en pæn sammenligningstabel.
 
+# Vi printer resultatet: 
 print(cv_sammenligning2)
 
 # 14. Konklusion til model nr. 2 -------------------------------------------
@@ -480,6 +662,7 @@ print(cv_sammenligning2)
 # 15. Gem filer til Power BI ----------------------------------------------
 
 write.csv(risk_list, "model2_risiko_liste.csv", row.names = FALSE)
+write.csv(risk_table, "model2_risiko_tabel.csv", row.names = FALSE)
 write.csv(economy_table, "model2_økonomisk_besparelse.csv", row.names = FALSE)
 write.csv(xgb_imp, "model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
 
