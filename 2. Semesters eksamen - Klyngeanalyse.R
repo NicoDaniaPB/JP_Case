@@ -8,8 +8,10 @@ behavior_agg <- read_csv("data/datasæt 2 - konstruerede variabler.csv")
 
 # 3. Join af adfærdsvariabler --------------------------------------------
 model_data <- model_data %>%
-  left_join(behavior_agg, by = "pseudo_id")
+  left_join(behavior_agg, by = "pseudo_id") %>%
+  select(-account_active_days)
 # Vi laver et left_join med model_data og behaviour_agg ved pesudo_id
+view(model_data)
 
 # 4. Udvælgelse af variabler til clustering -------------------------------
 cluster_vars_raw <- model_data %>% 
