@@ -1,4 +1,4 @@
-pacman::p_load(tidyverse, lubridate, caret, randomForest, xgboost, pROC)
+pacman::p_load("tidyverse", "caret", "randomForest", "xgboost", "pROC")
 
 # 1. Indlæsning af data -------------------------------------------------------
 
@@ -7,9 +7,9 @@ model_data_raw <- read_rds("data/renset_datasæt.rds")
 
 # 2. Yderligere klargøring af data til modellering ------------------------
 
-# Filtrering til kunder med target 
-model_data <- model_data_raw %>%
-  filter(!is.na(continued_after_campaign))
+# Filtrering til kunder med target BØR FJERNES!!!!!!!!!!!!!!!!!
+# model_data <- model_data_raw %>%
+  # filter(!is.na(continued_after_campaign))
 # Vi beholder nu kun de kunder, hvor target-variablen "continued_after_campaign"
 # ikke er NA. Altså kun observationer, hvor vi ved om kunden fortsatt efter 
 # kampagnen. 
@@ -26,9 +26,9 @@ model_data <- model_data %>%
 # omdannet fire kolonner til rigtige datoobjekter (Date). Dette trin er vigtigt
 # senere for feature engineering og modellering.
 
-# Vi fjerner order_tracktag og reason
-model_data <- model_data %>%
-  select(-order_trackertag, -reason)
+# Vi fjerner order_tracktag og reason BØR SLETTES!!!!!!!!!! VI FJERNER BARE DE TO MED DE ANDRE VARIABLER DER VÆLGES FRA
+# model_data <- model_data %>%
+  # select(-order_trackertag, -reason)
 # Vi har nu brugt mutate-funktionen til at bygge videre på "model_data", vi har
 # fjernet de to kolonner, vi ikke kan bruge til modelleringsdelen. 
 
@@ -375,6 +375,7 @@ JP_pris <- 199
 # Definition af højrisiko-kunder
 high_risk <- risk_list_sorted %>% 
   filter(churn_probability > 0.75)
+
 n_high_risk <- nrow(high_risk)
 # Vi filtrerer kunder med en churn-sandsynlighed over 75%.
 # n_high_risk = antal højrisiko-kunder. 
