@@ -251,24 +251,3 @@ full_data %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   write.table("data/renset_data.csv",
               sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
-
-#TEST KUN EN TEST EN FUCKING TEST
-behavior_agg
-
-behavior$page_url_clean
-
-behavior %>% 
-  filter(grepl("/erhverv/", page_url_clean)) %>% 
-  count()
-
-behavior %>% 
-  filter(grepl("erhverv", page_url_clean)) %>% 
-  count(page_url_clean) %>% 
-  arrange(desc(n)) %>% 
-  head(20)
-
-
-behavior %>% 
-  count(page_url_clean) %>% 
-  arrange(desc(n)) %>% 
-  head(50)
