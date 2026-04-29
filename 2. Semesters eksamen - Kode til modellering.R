@@ -193,9 +193,9 @@ behavior_agg <- behavior %>%
     dato          = as.Date(dt),
     sektion = case_when(
       grepl("/indland/", page_url_clean)          ~ "indland",
-      grepl("/udland/",  page_url_clean)          ~ "udland",
+      grepl("/international/",  page_url_clean)   ~ "international",
       grepl("/sport/",   page_url_clean)          ~ "sport",
-      grepl("/okonomi/", page_url_clean)          ~ "oekonomi",
+      grepl("/erhverv/", page_url_clean)          ~ "erhverv",
       grepl("/kultur/",  page_url_clean)          ~ "kultur",
       grepl("/opinion/", page_url_clean)          ~ "opinion",
       grepl("/debat/",   page_url_clean)          ~ "debat",
@@ -216,9 +216,9 @@ behavior_agg <- behavior %>%
     andel_email           = mean(refr_medium == "email",    na.rm = TRUE),
     andel_social          = mean(refr_medium == "social",   na.rm = TRUE),
     andel_indland         = mean(sektion == "indland"),
-    andel_udland          = mean(sektion == "udland"),
+    andel_international   = mean(sektion == "international"),
     andel_sport           = mean(sektion == "sport"),
-    andel_oekonomi        = mean(sektion == "oekonomi"),
+    andel_erhverv         = mean(sektion == "erhverv"),
     andel_forside         = mean(sektion == "forside"),
     gns_sider_pr_dag      = n() / n_distinct(dato),
     .groups = "drop"
@@ -233,3 +233,24 @@ full_data %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   write.table("data/renset_data.csv",
               sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+
+#TEST KUN EN TEST EN FUCKING TEST
+behavior_agg
+
+behavior$page_url_clean
+
+behavior %>% 
+  filter(grepl("/erhverv/", page_url_clean)) %>% 
+  count()
+
+behavior %>% 
+  filter(grepl("erhverv", page_url_clean)) %>% 
+  count(page_url_clean) %>% 
+  arrange(desc(n)) %>% 
+  head(20)
+
+
+behavior %>% 
+  count(page_url_clean) %>% 
+  arrange(desc(n)) %>% 
+  head(50)
