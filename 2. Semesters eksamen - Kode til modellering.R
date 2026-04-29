@@ -239,7 +239,6 @@ behavior_agg <- behavior %>%
   ) %>%
   mutate(across(everything(), ~replace_na(.x, 0)))
 
-view(behavior_agg)
 # 10. Gem det rensede datasæt -------------------------------------------------
 saveRDS(behavior_agg, "data/datasæt_konstruerede_variabler.rds")
 saveRDS(full_data, "data/renset_datasæt.rds")
