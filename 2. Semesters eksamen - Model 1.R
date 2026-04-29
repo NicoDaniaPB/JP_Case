@@ -41,13 +41,12 @@ model_data <- model_data %>%
 model_data <- model_data %>%
   mutate(
     days_since_user_created = as.numeric(order_date - usr_created),
-    days_to_cancel = as.numeric(subscription_cancel_date - order_date),
     age_at_order = as.numeric(difftime(order_date, birthdate, units = "days")) / 365,
     permission_user = ifelse(permission_given_order == TRUE, 1, 0),
     total_previous_engagement = previous_subscriptions + previous_campaigns + previous_trials,
     has_previous_subscriptions = ifelse(previous_subscriptions > 0, 1, 0),
     engagement_score = (visits * 0.4) + (unique_pages * 0.3) + (avg_scroll * 0.3),
-    age_engagement_interaction = age * engagement_score,
+    age_engagement_interaction = age_at_order * engagement_score,
     permission_engagement = permission_user * engagement_score
   ) %>%
   drop_na()
@@ -64,7 +63,6 @@ model_data <- model_data %>%
 model_data <- model_data %>%
   select(
     -subscription_cancel_date,
-    -days_to_cancel,
     -end_date,
     -expiration_date,
     -newsletters_after_order,

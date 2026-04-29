@@ -53,16 +53,13 @@ model2_data <- model2_data %>%
 # 3. Feature engineering --------------------------------------------------
 
 # Vi opretter nu nogle nye features, som skal være med til at øge modellens 
-# forklaringskraft. Udover det, så fjerner vi også NA-værdierne. 
-# Vi opretter nu nogle nye features, som skal være med til at øge modellens 
-# forklaringskraft. Udover det.
+# forklaringskraft.
 # Vi bruger pipeline-operatoren til at bygge videre på "model2_data". Vi bruger
 # mutate til at bygge nogle features, som skal styrke modellens forklaringsgrad.
 model2_data <- model2_data %>%
   mutate(
     days_since_user_created = as.numeric(difftime(order_date, usr_created, units = "days")),
-    age_at_order = as.numeric(difftime(order_date, birthdate, units = "days")) / 365,
-    total_previous_engagement = previous_subscriptions + previous_campaigns + previous_trials,
+    age_at_order = as.numeric(difftime(order_date, birthdate, units = "days")) / 365
   )
 
 # 4. Udvælgelse af variabler ------------------------------------------
@@ -114,10 +111,7 @@ train_index2 <- createDataPartition(model2_data$churn_10, p = 0.8, list = FALSE)
 train_data2 <- model2_data[train_index2, ]
 test_data2  <- model2_data[-train_index2, ]
 
-# Tester for multikolonaritet 
-
-findLinearCombos(train_data2 %>% select(where(is.numeric)))
-vif(glm(churn_10 ~ ., data = train_data2, family = binomial))
+# 6. Håndtering korrelerede variabler -----------------------------------------
 
 # Vi vil nu håndtere lineære korrelerede variabler, da lineære modeller som 
 # logistisk regression ikke kan håndtere det selv. Træ-baserede modeller som 
@@ -125,28 +119,15 @@ vif(glm(churn_10 ~ ., data = train_data2, family = binomial))
 # for vores logistisk regression model.
 
 # Tjek for perfekt korrelerede variabler
-cor_matrix <- cor(train_data2 %>% select(where(is.numeric)))
-high_cor <- which(abs(cor_matrix) > 0.95 & cor_matrix != 1, arr.ind = TRUE)
-print(high_cor)
-
-
-# 6. Håndtering korrelerede variabler ----------------------------------------------------------------------
-
-# Vi vil nu håndtere lineære korrelerede variabler, da lineære modeller som 
-# logistisk regression ikke kan håndtere det selv. Træ-baserede modeller som 
-# Random Forest eller XGBoost kan godt håndtere det, så derfor gør vi det kun
-# for vores logistisk regression model.
-
-# Tjek for perfekt korrelerede variabler
-cor_matrix <- cor(train_data2 %>% select(where(is.numeric)))
-high_cor <- which(abs(cor_matrix) > 0.95 & cor_matrix != 1, arr.ind = TRUE)
-print(high_cor)
+cor_matrix2 <- cor(train_data2 %>% select(where(is.numeric)))
+high_cor2 <- which(abs(cor_matrix2) > 0.95 & cor_matrix2 != 1, arr.ind = TRUE)
+print(high_cor2)
 
 # Tjek for lineær afhængighed
 findLinearCombos(train_data2 %>% select(where(is.numeric)))
 
-# Vi har nu kontrolleret for lineæreafhænigheder og behøver ikke foretager os yderligere tiltag, da der ingen er. 
-
+# Vi har nu kontrolleret for lineære afhænigheder og behøver ikke foretage os 
+# yderligere tiltag, da der ingen er. 
 
 # 7. Logistisk regression -------------------------------------
 
@@ -203,7 +184,7 @@ log_prob2 <- predict(log_model2, test_data2, type = "response")
 roc_log2 <- roc(test_data2$churn_10, log_prob2)
 cut_log2 <- as.numeric(coords(roc_log2, "best", ret = "threshold"))
 # roc() beregner ROC‑kurven
-# coords(..., "best") finder det cutoff der maksimerer Youden’s J, hvilket er:
+# coords(..., "best") finder det cutoff der maksimerer Youden's J, hvilket er:
 # = sensitivitet + specificitet – 1. Det giver os det optimale threshold i 
 # stedet for standard 0.5.
 
@@ -219,7 +200,7 @@ cm_log2
 # Vi konverterer til factor med korrekt rækkefølge, caret kræver at "No" er
 # første level. confusionMatrix() beregner vores nøgletal.
 
-# 7. Random Forest --------------------------------------------
+# 8. Random Forest --------------------------------------------
 
 # Vi sikrer reproducerbarhed
 set.seed(47)
@@ -241,7 +222,6 @@ rf_cv2 <- train(
 # tuneLength = 5 → caret tester 5 forskellige værdier af mtry 
 # (antal variabler pr. split)
 
-
 # Vi ser resultatet: 
 rf_cv2
 
@@ -253,12 +233,10 @@ rf_model2 <- randomForest(
   mtry = floor(sqrt(ncol(train_data2) - 1)),
   importance = TRUE
 )
-# Du træner en Random Forest manuelt med:
 # ntree = 500 -> antal træer i skoven
 # mtry = sqrt(p) -> klassisk tommelfingerregel for klassifikation
 # importance = TRUE → modellen beregner variable importance
-# Hvorfor både caret og en manuel model?
-#   caret‑modellen bruges til cross‑validation performance
+# caret‑modellen bruges til cross‑validation performance
 # den manuelle model bruges til prediction og ROC‑analyse på testdata
 
 # Prediction - Vi forudsiger sandsynligheder for vores testdatasæt
@@ -269,7 +247,7 @@ rf_prob2 <- predict(rf_model2, test_data2, type = "prob")[,2]
 # Vi bereger ROC-kurven og finder det optimale cutoff
 roc_rf2 <- roc(test_data2$churn_10, rf_prob2)
 cut_rf2 <- as.numeric(coords(roc_rf2, "best", ret = "threshold"))
-# ROC‑kurven beregnes, og det optimale cutoff findes ud fra Youden’s J:
+# ROC‑kurven beregnes, og det optimale cutoff findes ud fra Youden's J:
 # max(sensitivitet + specificitet – 1)
 # Dette giver et bedre cutoff end standard 0.5.
 
@@ -286,46 +264,40 @@ cm_rf2 <- confusionMatrix(rf_pred2, test_data2$churn_10)
 cm_rf2
 # Vi har nu en fuld evaluering af modellen. 
 
-# 8. XGBoost ---------------------------------------------------
+# 9. XGBoost ---------------------------------------------------
 
 # Vi laver en samlet model.matrix for hele datasættet
-# Tilføj dette lige efter full_matrix2 er lavet
-full_matrix2 <- model.matrix(churn_10 ~ . - 1, data = model2_data)
-colnames(full_matrix2)  
+full_matrix_m2 <- model.matrix(churn_10 ~ . - 1, data = model2_data)
+colnames(full_matrix_m2)  
 # model.matrix() konverterer alle features til numeriske kolonner, inkl. 
 # one‑hot encoding af faktorer.
 # -1 fjerner intercept‑kolonnen.
 # XGBoost kræver rene numeriske matricer, så dette er nødvendigt.
 
 # Vi konverterer target til numerisk
-full_label2  <- as.numeric(model2_data$churn_10) - 1
+full_label_m2 <- as.numeric(model2_data$churn_10) - 1
 # churn_10 er en factor med levels "No" og "Yes".
 # as.numeric() gør dem til 1 og 2.
 # -1 gør dem til 0 og 1 (som XGBoost kræver).
 
 # Vi splitter matrix og labels i train/test
-train_matrix2 <- full_matrix2[train_index2, ]
-test_matrix2  <- full_matrix2[-train_index2, ]
-# Du splitter både features og labels i train/test.
-# Du gemmer både:
+train_matrix_m2 <- full_matrix_m2[train_index2, ]
+test_matrix_m2  <- full_matrix_m2[-train_index2, ]
+# Vi splitter både features og labels i train/test.
+# Vi gemmer både:
 # numeriske labels (til XGBoost)
 # factor labels (til caret‑lignende funktioner).
 
 # Brug den originale factor-target til CV
-y_train2 <- model2_data$churn_10[train_index2]
+y_train_m2 <- model2_data$churn_10[train_index2]
 
-train_label2 <- full_label2[train_index2]
-test_label2  <- full_label2[-train_index2]
-
-# Vi splitter både features og labels i train/test.
-# Vi gemmer både:
-# numeriske labels (til XGBoost)
-# factor labels (til caret‑lignende funktioner)
+train_label_m2 <- full_label_m2[train_index2]
+test_label_m2  <- full_label_m2[-train_index2]
 
 # Vi laver en DMatrix
-dtrain2 <- xgb.DMatrix(data = train_matrix2, label = as.numeric(y_train2) - 1)
-dtest2  <- xgb.DMatrix(data = test_matrix2,
-                       label = as.numeric(model2_data$churn_10[-train_index2]) - 1)
+dtrain_m2 <- xgb.DMatrix(data = train_matrix_m2, label = as.numeric(y_train_m2) - 1)
+dtest_m2  <- xgb.DMatrix(data = test_matrix_m2,
+                         label = as.numeric(model2_data$churn_10[-train_index2]) - 1)
 # XGBoost bruger sin egen datastruktur: DMatrix.
 # Den er optimeret til hurtig træning og mindre hukommelsesforbrug.
 # Labels konverteres igen til 0/1.
@@ -334,7 +306,7 @@ dtest2  <- xgb.DMatrix(data = test_matrix2,
 set.seed(47)
 
 # Cross validation
-xgb_cv2 <- xgb.cv(
+xgb_cv_m2 <- xgb.cv(
   params = list(
     max_depth = 4,
     eta = 0.05,
@@ -343,7 +315,7 @@ xgb_cv2 <- xgb.cv(
     objective = "binary:logistic",
     eval_metric = "auc"
   ),
-  data = dtrain2,
+  data = dtrain_m2,
   nrounds = 300,
   nfold = 5,
   verbose = 0
@@ -356,14 +328,8 @@ xgb_cv2 <- xgb.cv(
 # objective = "binary:logistic" → binær klassifikation
 # eval_metric = "auc" → optimer efter AUC
 
-# xgb.cv giver os:
-# AUC for hver fold
-# Gennemsnitlig AUC
-# Standardafvigelse
-# Overfitting‑indikatorer
-
 # Vi ser resultatet:
-xgb_cv2
+xgb_cv_m2
 
 # Vi træner vores XGBoost-model
 xgb_model2 <- xgb.train(
@@ -375,7 +341,7 @@ xgb_model2 <- xgb.train(
     objective = "binary:logistic",
     eval_metric = "auc"
   ),
-  data = dtrain2,
+  data = dtrain_m2,
   nrounds = 300
 )
 # Vi træner en fuld XGBoost‑model på hele træningsdatasættet.
@@ -383,13 +349,13 @@ xgb_model2 <- xgb.train(
 # nrounds = 300 betyder 300 boosting‑iterationer.
 
 # Prediction 
-xgb_prob2 <- predict(xgb_model2, dtest2)
+xgb_prob2 <- predict(xgb_model2, dtest_m2)
 # XGBoost returnerer sandsynligheder for klassen "Yes".
 
 # ROC og cutoff
 roc_xgb2 <- roc(test_data2$churn_10, xgb_prob2)
 cut_xgb2 <- as.numeric(coords(roc_xgb2, "best", ret = "threshold"))
-# ROC‑kurven beregnes, og det optimale cutoff findes via Youden’s J:
+# ROC‑kurven beregnes, og det optimale cutoff findes via Youden's J:
 # max = (sensitivitet + specificitet – 1)
 # Dette giver et bedre cutoff end 0.5.
 
@@ -402,23 +368,23 @@ xgb_pred2 <- ifelse(xgb_prob2 > cut_xgb2, "Yes", "No") %>%
 # Vi laver vores Confusion Matrix
 cm_xgb2 <- confusionMatrix(xgb_pred2, test_data2$churn_10)
 cm_xgb2
-# # Vi har nu en fuld evaluering af modellen. 
+# Vi har nu en fuld evaluering af modellen. 
 
-# 9. Tabel over risikable kunder ------------------------------------------
+# 10. Tabel over risikable kunder ------------------------------------------
 
-# Gem ID'er datasættene
-train_ids <- model2_ids[train_index2]
-test_ids  <- model2_ids[-train_index2]
-# Vi tager de pseudo‑ID’er, vi gemte tidligere (model2_ids)
+# Gem ID'er for datasættene
+train_ids_m2 <- model2_ids[train_index2]
+test_ids_m2  <- model2_ids[-train_index2]
+# Vi tager de pseudo‑ID'er, vi gemte tidligere (model2_ids)
 # Vi splitter dem i:
-# train_ids → ID’er i træningsdatasættet
-# test_ids → ID’er i testdatasættet
+# train_ids_m2 → ID'er i træningsdatasættet
+# test_ids_m2 → ID'er i testdatasættet
 # Det er fordi vi laver predictions på testdata, og vi skal kunne matche dem 
 # tilbage til de rigtige kunder.
 
 # Lav risk-listen med de rigtige variabler
-risk_list <- tibble(
-  pseudo_id = test_ids,
+risk_list_m2 <- tibble(
+  pseudo_id = test_ids_m2,
   churn_probability = xgb_prob2,
   predicted_class = xgb_pred2
 )
@@ -429,14 +395,13 @@ risk_list <- tibble(
 # Dette er den rå risikoliste.
 
 # Sortér efter risiko
-risk_list_sorted <- risk_list %>%
+risk_list_sorted_m2 <- risk_list_m2 %>%
   arrange(desc(churn_probability))
 # Listen sorteres fra højeste til laveste churn‑sandsynlighed.
 # De mest risikofyldte kunder kommer øverst.
-# Dette er typisk det første retention‑teams vil se på.
 
 # Lav endelig tabel
-risk_table <- risk_list_sorted %>%
+risk_table_m2 <- risk_list_sorted_m2 %>%
   mutate(
     churn_risk_pct = round(churn_probability * 100, 1),
     risk_group = case_when(
@@ -451,16 +416,12 @@ risk_table <- risk_list_sorted %>%
     predicted_class,
     risk_group
   )
-# Vi laver den endelige tabel, hvor vi laver tre risikogrupper:
+# Vi laver den endelige tabel med tre risikogrupper:
 # Højere end 75% churn-risiko
 # Mellem 50% til 75% churn-risiko
 # Under 50% churn risiko
-# Vi vælger de relevante variabler vi vil have med. 
 
-# Se resultat for de første 50 rækker.
-head(risk_table, 50)
-
-# 10. Økonomisk analyse af churn-kampagne ---------------------------------
+# 11. Økonomisk analyse af churn-kampagne ---------------------------------
 
 # Vi laver nu en økonomisk beregning af værdien ved at redde høj-risiko-kunder
 # og vi gør det for tre forskellige scenarier. 
@@ -469,48 +430,45 @@ head(risk_table, 50)
 JP_pris <- 199  
 
 # Definition af højrisiko-kunder
-high_risk <- risk_list_sorted %>% 
+high_risk_m2 <- risk_list_sorted_m2 %>% 
   filter(churn_probability > 0.75)
-n_high_risk <- nrow(high_risk)
+n_high_risk_m2 <- nrow(high_risk_m2)
 # Vi filtrerer kunder med en churn-sandsynlighed over 75%.
-# n_high_risk = antal højrisiko-kunder. 
+# n_high_risk_m2 = antal højrisiko-kunder. 
 
 # 5% uplift
-uplift_5 <- 0.05
-saved_5 <- n_high_risk * uplift_5
-value_3m_5  <- saved_5 * JP_pris * 3
-value_6m_5  <- saved_5 * JP_pris * 6
-value_12m_5 <- saved_5 * JP_pris * 12
+saved_5_m2   <- n_high_risk_m2 * 0.05
+value_3m_5_m2  <- saved_5_m2 * JP_pris * 3
+value_6m_5_m2  <- saved_5_m2 * JP_pris * 6
+value_12m_5_m2 <- saved_5_m2 * JP_pris * 12
 
 # 15% uplift
-uplift_15 <- 0.15
-saved_15 <- n_high_risk * uplift_15
-value_3m_15  <- saved_15 * JP_pris * 3
-value_6m_15  <- saved_15 * JP_pris * 6
-value_12m_15 <- saved_15 * JP_pris * 12
+saved_15_m2   <- n_high_risk_m2 * 0.15
+value_3m_15_m2  <- saved_15_m2 * JP_pris * 3
+value_6m_15_m2  <- saved_15_m2 * JP_pris * 6
+value_12m_15_m2 <- saved_15_m2 * JP_pris * 12
 
 # 25% uplift
-uplift_25 <- 0.25
-saved_25 <- n_high_risk * uplift_25
-value_3m_25  <- saved_25 * JP_pris * 3
-value_6m_25  <- saved_25 * JP_pris * 6
-value_12m_25 <- saved_25 * JP_pris * 12
+saved_25_m2   <- n_high_risk_m2 * 0.25
+value_3m_25_m2  <- saved_25_m2 * JP_pris * 3
+value_6m_25_m2  <- saved_25_m2 * JP_pris * 6
+value_12m_25_m2 <- saved_25_m2 * JP_pris * 12
 
 # Samlet tabel
-economy_table <- tibble(
+economy_table_m2 <- tibble(
   scenario = c("5% (Worst case)", "15% (Realistisk)", "25% (Optimistisk)"),
-  højrisiko_kunder = n_high_risk,
-  reddede_kunder = round(c(saved_5, saved_15, saved_25)),
-  besparelse_3m = round(c(value_3m_5, value_3m_15, value_3m_25)),
-  besparelse_6m = round(c(value_6m_5, value_6m_15, value_6m_25)),
-  besparelse_12m = round(c(value_12m_5, value_12m_15, value_12m_25))
+  højrisiko_kunder = n_high_risk_m2,
+  reddede_kunder = round(c(saved_5_m2, saved_15_m2, saved_25_m2)),
+  besparelse_3m = round(c(value_3m_5_m2, value_3m_15_m2, value_3m_25_m2)),
+  besparelse_6m = round(c(value_6m_5_m2, value_6m_15_m2, value_6m_25_m2)),
+  besparelse_12m = round(c(value_12m_5_m2, value_12m_15_m2, value_12m_25_m2))
 )
 # Vi har nu samlet resultaterne i en tibble ved combine (c) funktionen. 
 
 # Vi ser resultaterne
-economy_table
+economy_table_m2
 
-# 11. AUC-sammenligning -------------------------------------------------------
+# 12. AUC-sammenligning -------------------------------------------------------
 
 # Vi beregner AUC for alle modeller
 auc_log2 <- as.numeric(pROC::auc(roc_log2))
@@ -566,22 +524,21 @@ legend("bottomright",
 # Til sidst tilføjer vi en forklaringsboks nederst til højre, den viser: 
 # modelnavn, farve og AUC‑værdien. Dette gør grafen let at aflæse. 
 
-# 12. Variabelvigtighed -------------------------------------------------------
+# 13. Variabelvigtighed -------------------------------------------------------
 
 # Random Forest: built-in importance
-# MeanDecreaseGini måler hvor meget hver variabel bidrager til
+# MeanDecreaseGini måler hvor meget
 # at reducere usikkerhed på tværs af alle træer i skoven
 rf_imp2 <- importance(rf_model2) %>%
   as.data.frame() %>%
   rownames_to_column("variabel") %>%
   arrange(desc(MeanDecreaseGini))
-# importance(rf_model2) henter Random Forest’s indbyggede variabelvigtighed.
+# importance(rf_model2) henter Random Forest's indbyggede variabelvigtighed.
 # Random Forest bruger MeanDecreaseGini, som måler hvor meget en variabel 
 # reducerer usikkerhed (Gini impurity) på tværs af alle træer.
 # Vi konverterer resultatet til en data frame.
 # Vi tilføjer variabelnavne som en kolonne.
 # Vi sorterer variablerne efter vigtigst → mindst vigtig.
-# Dette giver os en rangeret liste over de mest betydningsfulde features.
 
 # Vi plotter de 15 vigtigste variabler
 rf_imp2 %>%
@@ -599,15 +556,13 @@ rf_imp2 %>%
 # Vi tager de 15 vigtigste variabler.
 # Vi laver et horisontalt søjlediagram.
 # Variablerne sorteres efter betydning.
-# Grafen viser visuelt hvilke features Random Forest bruger mest.
 
 # XGBoost: feature importance
 xgb_imp2 <- xgb.importance(model = xgb_model2) %>%
   as_tibble()
-# xgb.importance() henter XGBoost’s feature importance.
+# xgb.importance() henter XGBoost's feature importance.
 # XGBoost bruger typisk Gain, som måler hvor meget en variabel forbedrer 
-# modellens præcision, når den bruges til splits. Vi konverterer resultatet til
-# en tibble.
+# modellens præcision, når den bruges til splits.
 
 # Vi plotter de 15 vigtigste variabler
 xgb_imp2 %>%
@@ -625,21 +580,18 @@ xgb_imp2 %>%
 # Vi tager de 15 vigtigste XGBoost‑features.
 # Vi laver et horisontalt søjlediagram.
 # Variablerne sorteres efter Gain.
-# Grafen viser hvilke features XGBoost finder mest informative.
 
-
-# 13. Cross validation sammenligning -----------------------------------------
+# 14. Cross validation sammenligning -----------------------------------------
 
 # Udtræk af CV-resultater fra logistisk regression (caret-pakken)
 log_cv2_results <- log_cv2$results %>%
   select(ROC, Sens, Spec) %>%
   slice(which.max(ROC)) %>%
   mutate(Model = "Logistisk regression")
-# log_cv2$results indeholder caret’s cross‑validation‑resultater for alle fold.
+# log_cv2$results indeholder caret's cross‑validation‑resultater for alle fold.
 # Vi vælger kun kolonnerne: ROC, Sens og Spec. 
 # slice(which.max(ROC)) vælger den række hvor ROC er højest.
 # Vi tilføjer en kolonne med modelnavnet.
-# Dette giver den bedste CV‑performance for logistisk regression.
 
 # Udtræk af CV-resultater fra Random Forest (caret-pakken)
 rf_cv2_results <- rf_cv2$results %>%
@@ -651,14 +603,13 @@ rf_cv2_results <- rf_cv2$results %>%
 # Udtræk af CV-resultater fra XGBoost (xgb.cv)
 xgb_cv2_results <- tibble(
   Model = "XGBoost",
-  ROC   = max(xgb_cv2$evaluation_log$test_auc_mean),
+  ROC   = max(xgb_cv_m2$evaluation_log$test_auc_mean),
   Sens  = NA,   # xgb.cv giver ikke Sens/Spec direkte
   Spec  = NA
 )
-# Vi bruger XGBoost's egen indbygget cross-validation, og ikke caret-pakken, da 
-# det gav os problemer. 
-# XGBoost’s cross‑validation (xgb.cv) gemmer resultater i evaluation_log.
-# Vi  tager den højeste gennemsnitlige test‑AUC.
+# Vi bruger XGBoost's egen indbygget cross-validation.
+# XGBoost's cross‑validation (xgb.cv) gemmer resultater i evaluation_log.
+# Vi tager den højeste gennemsnitlige test‑AUC.
 # XGBoost giver ikke sensitivitet og specificitet i CV, så de sættes til NA.
 
 # Vi samler alle CV-resultater i en tabel
@@ -675,27 +626,23 @@ cv_sammenligning2 <- bind_rows(
 # Vi printer resultatet: 
 print(cv_sammenligning2)
 
-# 14. Konklusion til model nr. 2 -------------------------------------------
 
-# Vi har udviklet en klassifikationsmodel til at forudsige churn_10 blandt
-# kunder der fortsætter efter kampagneperioden. Modellen identificerer kunder
-# der churner inden for 10 dage efter kampagnens afslutning — typisk kunder
-# der glemte at afmelde og reagerer når de ser første betaling.
-# XGBoost er den bedste model med AUC = 0.828 og en god balance mellem
-# sensitivity (86%) og specificity (66,7%), hvilket gør den velegnet til
-# at identificere risikokunder.
-# Random Forest har lavere AUC (0.802) og lignende specificity (81%), men 
-# lavere sensitivity på 69.8%. Denne ubaalance gør den uegnet til JP's 
-# problemstilling. Logistisk regression er ikke egnet med AUC på 0.709.
-# Den vigtigste forklarende variabel er 
-# account_active_days_before_campaign — kunder med lang historik hos JP 
-# churner markant sjældnere end nye kunder.
+# 15. Konklusion ----------------------------------------------------------
 
-# 15. Gem filer til Power BI ----------------------------------------------
+# Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
+# fortsætter efter kampagneperioden (churn eller ej). Vi har brugt korrekt 
+# feature engineering og fjernet dataleakage, og lavet tre forskellige 
+# klassifikationsmodeller. XGBoost modellen opnår den højeste AUC på 78,5% 
+# og dermed den bedste balance mellem sensitivitet og specificitet, hvor den 
+# finder 75,0% af churnerne og 70,8% af de kunder der fortsætter. Random 
+# Forest har en AUC på 77,1% og finder 94,2% af churnerne, men kun 44,3% af 
+# ikke-churnerne — en ubalance der gør den mindre egnet. Logistisk regression 
+# er den svageste model med AUC på 66,9%. Vi har valgt XGBoost da den har den 
+# bedste balance mellem sensitivitet og specificitet.
 
-write.csv(risk_list, "model2_risiko_liste.csv", row.names = FALSE)
-write.csv(risk_table, "model2_risiko_tabel.csv", row.names = FALSE)
-write.csv(economy_table, "model2_økonomisk_besparelse.csv", row.names = FALSE)
-write.csv(xgb_imp2, "model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
-# Sammenligning af modeller
-write.csv(model_sammenligning2, "data/model_sammenligning.csv", row.names = FALSE)
+# 16. Gem filer til Power BI ----------------------------------------------
+write.csv(risk_list_m2, "data/model2_risiko_liste.csv", row.names = FALSE)
+write.csv(risk_table_m2, "data/model2_risiko_tabel.csv", row.names = FALSE)
+write.csv(economy_table_m2,"data/model2_økonomisk_besparelse.csv", row.names = FALSE)
+write.csv(xgb_imp2, "data/model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
+write.csv(model_sammenligning2,"data/model2_sammenligning.csv", row.names = FALSE)
