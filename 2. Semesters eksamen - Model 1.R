@@ -7,13 +7,6 @@ model_data_raw <- read_rds("data/renset_datasæt.rds")
 
 # 2. Yderligere klargøring af data til modellering ------------------------
 
-# Filtrering til kunder med target BØR FJERNES!!!!!!!!!!!!!!!!!
-# model_data <- model_data_raw %>%
-  # filter(!is.na(continued_after_campaign))
-# Vi beholder nu kun de kunder, hvor target-variablen "continued_after_campaign"
-# ikke er NA. Altså kun observationer, hvor vi ved om kunden fortsatt efter 
-# kampagnen. 
-
 # Datoformatering
 model_data <- model_data_raw %>%
   mutate(
@@ -25,12 +18,6 @@ model_data <- model_data_raw %>%
 # Vi har nu brugt mutate-funktionen til at bygge videre på "model_data", vi har
 # omdannet fire kolonner til rigtige datoobjekter (Date). Dette trin er vigtigt
 # senere for feature engineering og modellering.
-
-# Vi fjerner order_tracktag og reason BØR SLETTES!!!!!!!!!! VI FJERNER BARE DE TO MED DE ANDRE VARIABLER DER VÆLGES FRA
-# model_data <- model_data %>%
-  # select(-order_trackertag, -reason)
-# Vi har nu brugt mutate-funktionen til at bygge videre på "model_data", vi har
-# fjernet de to kolonner, vi ikke kan bruge til modelleringsdelen. 
 
 # Target som factor
 model_data <- model_data %>%
@@ -54,14 +41,12 @@ model_data <- model_data %>%
 model_data <- model_data %>%
   mutate(
     days_since_user_created = as.numeric(order_date - usr_created),
-    days_between_signup_and_order = as.numeric(order_date - usr_created),
     days_to_cancel = as.numeric(subscription_cancel_date - order_date),
     age_at_order = as.numeric(difftime(order_date, birthdate, units = "days")) / 365,
     permission_user = ifelse(permission_given_order == TRUE, 1, 0),
     total_previous_engagement = previous_subscriptions + previous_campaigns + previous_trials,
     has_previous_subscriptions = ifelse(previous_subscriptions > 0, 1, 0),
     engagement_score = (visits * 0.4) + (unique_pages * 0.3) + (avg_scroll * 0.3),
-    mobile_heavy = ifelse(mobile_ratio > 0.7, 1, 0),
     age_engagement_interaction = age * engagement_score,
     permission_engagement = permission_user * engagement_score
   ) %>%
@@ -95,7 +80,9 @@ model_data <- model_data %>%
     -account_active_days,
     -churn_10,
     -order_trackertag,  
-    -reason    
+    -reason,
+    -permission_given_today,
+    -age
   )
 
 # Vi har nu brugt pipe-operatoren til at bygge ovenpå "model_data". Vi har brugt
@@ -119,8 +106,12 @@ test_data  <- model_data[-train_index, ]
 # Vi splitter pseudo_ids så det er med i test-dataene
 test_ids <- pseudo_ids[-train_index]
 
-
 # 6. Håndtering korrelerede variabler ----------------------------------------
+
+# Vi vil nu håndtere lineære korrelerede variabler, da lineære modeller som 
+# logistisk regression ikke kan håndtere det selv. Træ-baserede modeller som 
+# Random Forest eller XGBoost kan godt håndtere det, så derfor gør vi det kun
+# for vores logistisk regression model.
 
 # Tjek for perfekt korrelerede variabler
 cor_matrix <- cor(train_data %>% select(where(is.numeric)))
@@ -136,13 +127,14 @@ colnames(train_data)
 # Vi fjerner de korrelerede variabler
 num_vars <- train_data %>% select(where(is.numeric))
 
-vars_to_remove <- colnames(num_vars)[c(16, 19, 21)]
+vars_to_remove <- colnames(num_vars)[c(17, 19)]
 
-train_data <- train_data %>% select(-all_of(vars_to_remove))
-test_data  <- test_data %>% select(-all_of(vars_to_remove))
+train_data_log_reg <- train_data %>% select(-all_of(vars_to_remove))
+test_data_log_reg  <- test_data %>% select(-all_of(vars_to_remove))
 
+# Vi tjekker for lineær afhængighed igen
+findLinearCombos(train_data_log_reg %>% select(where(is.numeric)))
          
-
 # 7. Logistisk regression ----------------------------------------------------
 
 # Vi sikrer reproducerbarhed
@@ -163,7 +155,7 @@ cv_ctrl <- trainControl(
 # caret-pakken. 
 log_cv <- train(
   continued_after_campaign ~ .,
-  data = train_data,
+  data = train_data_log_reg,
   method = "glm",
   family = binomial,
   trControl = cv_ctrl,
@@ -177,17 +169,17 @@ log_cv <- train(
 # til at lave predictions på test-data. 
 log_model <- glm(
   continued_after_campaign ~ ., 
-  data = train_data,
+  data = train_data_log_reg,
   family = binomial
 )
 # Vi har nu trænet alle features med "~", og brugt binomialt link.
 
 # Vi forudsiger nu sandsynglighederne på test-data
-log_prob <- predict(log_model, test_data, type = "response")
+log_prob <- predict(log_model, test_data_log_reg, type = "response")
 # type = "response" giver sandsyngliheder for klassen "Yes"
 
 # Vi laver nu vores ROC-kurve
-roc_log <- roc(test_data$continued_after_campaign, log_prob)
+roc_log <- roc(test_data_log_reg$continued_after_campaign, log_prob)
 # ROC-kurven er baseret på de sande labels, og de forudsagte sandsynligheder. 
 
 # Vi finder det optimale cutoff (dvs. det cutoff, der maksimerer Youden's J)
@@ -203,7 +195,7 @@ log_pred <- ifelse(log_prob > cut_log, "Yes", "No") %>%
 
 # Vi laver vores Confusion matrix med test-dataene, for at evaluere modellens
 # performance. 
-cm_log <- confusionMatrix(log_pred, test_data$continued_after_campaign)
+cm_log <- confusionMatrix(log_pred, test_data_log_reg$continued_after_campaign)
 # Dette giver os vores møgletal, som skal bruges til at vurdere modellen. 
 
 # 8. Random Forest -----------------------------------------------------------
@@ -591,30 +583,37 @@ cv_sammenligning <- bind_rows(
 # Vi ser resultatet
 print(cv_sammenligning)
 
-# Vi kan se, at XGboost modellen opnår den højeste cross validation ROC på 
-# 87.28%. Hvilket betyder, at det er den der generaliser bedst på nye ukendte 
-# data. Random Forest performer også meget godt, men en CV-ROC på 87.12%. 
+# Vi kan se, at Random Forest og XGBoost modellerne opnår den højeste 
+# cross validation ROC på 82%. Hvilket betyder, at de er dem der generaliser
+# bedst på nye ukendte data. 
 
 # 15. Konklusion til ML-model nr. 1 --------------------------------------------
 
 # Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
-# fortsætter efter kampagneperioden. Vi har brugt korrekt feature engineering og
-# fjernet dataleakage, og lavet tre forskellige klassifikationsmodeller. XGBoost
-# modellen opnår den højeste AUC på 90.1%. og dermed den bedste balance mellem 
-# sensitivity og specificity, hvor den finder 90.1% true-positives. Det er 
-# derfor den bedste model til at forudsige churn efter kampagnen. 
-# XGBoost-model har en accuracy på 82.5%. Modellen identificerer 90.4% af 
-# churnerne og 74.8% af de kunder, der fortsætter, hvilket gør den velegnet til 
-# at understøtte JPs problemstillinger. 
+# fortsætter efter kampagneperioden (churn eller ej). Vi har brugt korrekt 
+# feature engineering og fjernet dataleakage, og lavet tre forskellige 
+# klassifikationsmodeller. XGBoost modellen opnår den højeste AUC på 817%. og 
+# dermed den bedste balance mellem sensitivity og specificity, hvor den finder
+# 81,7%  af true-positives. Det er derfor den bedste model til at forudsige 
+# churn efter kampagnen. XGBoost-model har en accuracy på 74,4%. Modellen 
+# identificerer 86,5% af churnerne og 62.6% af de kunder, der fortsætter, 
+# hvilket gør at vi vurderer den som den bedste velegnet model til at 
+# understøtte JPs problemstillinger, da den har den bedste balance mellem 
+# sensitivity og specificity. Random Forest modellen har næsten lige så høj 
+# accuracy som XGBoost, kun 0,5 procent-point i forskel. Den er bedre til at 
+# finde churnere, da den har en sensitivity på 93,3%. Men den er dårligere til
+# at finde ikke-churnere med en specifity på 55,1%. Både RF og XGBoost modellerne
+# kan bruges til JP's problemstillinger. Vi har dog valgt, at gå med XGBoost, da
+# den har den bedste balance mellem sensitivity og specificity. 
 
 # 16. Gem som CSV-filer til Power BI ------------------------------------------
 
 saveRDS(xgb_model, "data/xgb_model.rds")
 
 # Risiko liste
-risk_list %>%
+risk_table %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
-  write.table("data/risiko_liste.csv",
+  write.table("data/risiko_tabel.csv",
               sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
 
 # Økonomisk besparelse
