@@ -177,9 +177,56 @@ full_data <- sub_cancel %>%
     )
   )
 
-# 9. Gem det rensede datasæt -------------------------------------------------
 
-saveRDS(full_data, "churn_app/renset_datasæt.rds")
+# 9. Variabler til klyngeanalyse  -----------------------------------------
+
+mode_safe <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) return(NA_character_)
+  names(sort(table(x), decreasing = TRUE))[1]
+}
+
+behavior_agg <- behavior %>%
+  mutate(
+    er_artikel    = grepl("ECE\\d{8}", page_url_clean),
+    er_restricted = page_restricted == "yes",
+    dato          = as.Date(dt),
+    sektion = case_when(
+      grepl("/indland/", page_url_clean)          ~ "indland",
+      grepl("/udland/",  page_url_clean)          ~ "udland",
+      grepl("/sport/",   page_url_clean)          ~ "sport",
+      grepl("/okonomi/", page_url_clean)          ~ "oekonomi",
+      grepl("/kultur/",  page_url_clean)          ~ "kultur",
+      grepl("/opinion/", page_url_clean)          ~ "opinion",
+      grepl("/debat/",   page_url_clean)          ~ "debat",
+      page_url_clean == "https://jyllands-posten.dk/" ~ "forside",
+      TRUE ~ "andet")) %>%
+  group_by(pseudo_id) %>%
+  summarise(
+    antal_sidevisninger   = n(),
+    antal_unikke_dage     = n_distinct(dato),
+    antal_unikke_sider    = n_distinct(page_url_clean),
+    antal_artikler        = sum(er_artikel),
+    gns_scroll            = mean(scroll_depth, na.rm = TRUE),
+    andel_restricted      = mean(er_restricted, na.rm = TRUE),
+    er_mobil_primær       = as.integer(mode_safe(dvce_type) == "Mobile"),
+    antal_devices         = n_distinct(dvce_type),
+    andel_search          = mean(refr_medium == "search",   na.rm = TRUE),
+    andel_internal        = mean(refr_medium == "internal", na.rm = TRUE),
+    andel_email           = mean(refr_medium == "email",    na.rm = TRUE),
+    andel_social          = mean(refr_medium == "social",   na.rm = TRUE),
+    andel_indland         = mean(sektion == "indland"),
+    andel_udland          = mean(sektion == "udland"),
+    andel_sport           = mean(sektion == "sport"),
+    andel_oekonomi        = mean(sektion == "oekonomi"),
+    andel_forside         = mean(sektion == "forside"),
+    gns_sider_pr_dag      = n() / n_distinct(dato),
+    .groups = "drop"
+  )
+
+# 10. Gem det rensede datasæt -------------------------------------------------
+saveRDS(behavior_agg, "data/datasæt_konstruerede_variabler.rds")
+saveRDS(full_data, "data/renset_datasæt.rds")
 full_data %>%
   mutate(across(where(is.Date), ~ as.character(.x))) %>%
   mutate(across(everything(), ~ ifelse(is.na(.x), "", .x))) %>%
