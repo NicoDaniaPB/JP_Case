@@ -179,50 +179,68 @@ full_data <- sub_cancel %>%
 
 
 # 9. Variabler til klyngeanalyse  -----------------------------------------
-
-mode_safe <- function(x) {
-  x <- x[!is.na(x)]
-  if (length(x) == 0) return(NA_character_)
-  names(sort(table(x), decreasing = TRUE))[1]
-}
-
+view(behavior_agg)
 behavior_agg <- behavior %>%
   mutate(
-    er_artikel    = grepl("ECE\\d{8}", page_url_clean),
+    er_artikel    = str_detect(page_url_clean, "ECE\\d{8}"),
     er_restricted = page_restricted == "yes",
     dato          = as.Date(dt),
     sektion = case_when(
-      grepl("/indland/", page_url_clean)          ~ "indland",
-      grepl("/international/",  page_url_clean)   ~ "international",
-      grepl("/sport/",   page_url_clean)          ~ "sport",
-      grepl("/erhverv/", page_url_clean)          ~ "erhverv",
-      grepl("/kultur/",  page_url_clean)          ~ "kultur",
-      grepl("/opinion/", page_url_clean)          ~ "opinion",
-      grepl("/debat/",   page_url_clean)          ~ "debat",
+      str_detect(page_url_clean, "/indland/")        ~ "indland",
+      str_detect(page_url_clean, "/international/")  ~ "international",
+      str_detect(page_url_clean, "/sport/")          ~ "sport",
+      str_detect(page_url_clean, "/erhverv/")        ~ "erhverv",
+      str_detect(page_url_clean, "/kultur/")         ~ "kultur",
+      str_detect(page_url_clean, "/livsstil/")       ~ "livsstil",
+      str_detect(page_url_clean, "/debat/")          ~ "debat",
+      str_detect(page_url_clean, "/politik/")        ~ "politik",
+      str_detect(page_url_clean, "/rejser/")         ~ "rejser",
+      str_detect(page_url_clean, "/viden/")          ~ "viden",
+      str_detect(page_url_clean, "/biler/")          ~ "biler",
       page_url_clean == "https://jyllands-posten.dk/" ~ "forside",
-      TRUE ~ "andet")) %>%
+      TRUE ~ "andet"
+    )
+  ) %>%
   group_by(pseudo_id) %>%
   summarise(
-    antal_sidevisninger   = n(),
-    antal_unikke_dage     = n_distinct(dato),
-    antal_unikke_sider    = n_distinct(page_url_clean),
-    antal_artikler        = sum(er_artikel),
-    gns_scroll            = mean(scroll_depth, na.rm = TRUE),
-    andel_restricted      = mean(er_restricted, na.rm = TRUE),
-    er_mobil_primær       = as.integer(mode_safe(dvce_type) == "Mobile"),
-    antal_devices         = n_distinct(dvce_type),
-    andel_search          = mean(refr_medium == "search",   na.rm = TRUE),
-    andel_internal        = mean(refr_medium == "internal", na.rm = TRUE),
-    andel_email           = mean(refr_medium == "email",    na.rm = TRUE),
-    andel_social          = mean(refr_medium == "social",   na.rm = TRUE),
-    andel_indland         = mean(sektion == "indland"),
-    andel_international   = mean(sektion == "international"),
-    andel_sport           = mean(sektion == "sport"),
-    andel_erhverv         = mean(sektion == "erhverv"),
-    andel_forside         = mean(sektion == "forside"),
-    gns_sider_pr_dag      = n() / n_distinct(dato),
+    antal_sidevisninger = n(),
+    antal_unikke_dage   = n_distinct(dato),
+    antal_unikke_sider  = n_distinct(page_url_clean),
+    antal_artikler      = sum(er_artikel),
+    gns_scroll          = mean(scroll_depth, na.rm = TRUE),
+    andel_restricted    = mean(er_restricted),
+    
+    er_mobil_primær = {
+      t <- table(dvce_type)
+      if (length(t) == 0) NA_integer_
+      else as.integer(names(which.max(t)) == "Mobile")
+    },
+    
+    antal_devices       = n_distinct(dvce_type),
+    
+    andel_search        = mean(refr_medium == "search"),
+    andel_internal      = mean(refr_medium == "internal"),
+    andel_email         = mean(refr_medium == "email"),
+    andel_social        = mean(refr_medium == "social"),
+    
+    andel_indland       = mean(sektion == "indland"),
+    andel_international = mean(sektion == "international"),
+    andel_sport         = mean(sektion == "sport"),
+    andel_erhverv       = mean(sektion == "erhverv"),
+    andel_kultur        = mean(sektion == "kultur"),
+    andel_livsstil      = mean(sektion == "livsstil"),
+    andel_debat         = mean(sektion == "debat"),
+    andel_politik       = mean(sektion == "politik"),
+    andel_rejser        = mean(sektion == "rejser"),
+    andel_viden         = mean(sektion == "viden"),
+    andel_forside       = mean(sektion == "forside"),
+    
+    gns_sider_pr_dag    = n() / n_distinct(dato),
+    
     .groups = "drop"
-  )
+  ) %>%
+  mutate(across(everything(), ~replace_na(.x, 0)))
+
 
 # 10. Gem det rensede datasæt -------------------------------------------------
 saveRDS(behavior_agg, "data/datasæt_konstruerede_variabler.rds")

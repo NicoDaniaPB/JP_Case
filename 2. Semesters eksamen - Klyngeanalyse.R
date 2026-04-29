@@ -4,44 +4,42 @@ pacman::p_load(tidyverse, cluster, FactoMineR, factoextra, janitor)
 model_data <- readRDS("data/renset_datasæt.rds")
 
 # 2. Indlæsning af konstruerede variabler ---------------------------------
-behavior_agg <- read_csv("data/datasæt 2 - konstruerede variabler.csv")
-
+behavior_agg <- readRDS("data/datasæt_konstruerede_variabler.rds")
+glimpse(model_data)
 # 3. Join af adfærdsvariabler --------------------------------------------
 model_data <- model_data %>%
-  left_join(behavior_agg, by = "pseudo_id") %>%
-  select(-account_active_days)
+  left_join(behavior_agg, by = "pseudo_id") 
 # Vi laver et left_join med model_data og behaviour_agg ved pesudo_id
-view(model_data)
 
 # 4. Udvælgelse af variabler til clustering -------------------------------
 cluster_vars_raw <- model_data %>% 
-  select(
-    pseudo_id,
-    koen, age_group, age,
-    length_group, previous_subscriptions, previous_campaigns, previous_trials,
-    fast_churn, continued_after_campaign,
+  select(any_of(c(
+    "pseudo_id",
+    "koen", "age_group", "age",
+    "length_group", "previous_subscriptions", "previous_campaigns", "previous_trials",
+    "fast_churn", "continued_after_campaign",
     
-    # Konstruerede adfærdsvariabler
-    antal_sidevisninger,
-    antal_unikke_sider,
-    andel_restricted,
-    gns_scroll,
-    er_mobil_primær,
-    antal_devices,
-    andel_search,
-    andel_internal,
-    andel_email,
-    andel_social,
-    andel_indland,
-    andel_udland,
-    andel_sport,
-    andel_oekonomi,
-    andel_forside,
-    gns_sider_pr_dag,
+    # Adfærd
+    "antal_sidevisninger",
+    "antal_unikke_sider",
+    "andel_restricted",
+    "gns_scroll",
+    "er_mobil_primær",
+    "antal_devices",
+    "andel_search",
+    "andel_internal",
+    "andel_email",
+    "andel_social",
+    "andel_indland",
+    "andel_kultur",
+    "andel_sport",
+    "andel_erhverv",  
+    "andel_forside",
+    "gns_sider_pr_dag",  
     
-    type
-  ) %>% 
-  drop_na()
+    "type"
+  )))
+
 # Vi har nu valgt de relevante variabler, som skal indgå i vores klyngeanalyse.
 # pseudo_id beholdes til senere join.
 # drop_na() fjerner alle ræækker med manglende værdier i nogen af de valgte 
@@ -49,7 +47,8 @@ cluster_vars_raw <- model_data %>%
 
 # 5. Konvertering af character til factor ---------------------------------
 cluster_vars <- cluster_vars_raw %>% 
-  mutate(across(-pseudo_id, ~ if (is.numeric(.x)) .x else as.factor(.x)))
+  mutate(across(-pseudo_id & where(is.character), as.factor))
+
 # Alle kolonner undtagen pseudo_id forbliver numerisk, hvis den kolonne er 
 # numerisk, ellers konverteres den til en factor. 
 
