@@ -16,8 +16,8 @@ cluster_vars_raw <- model_data %>%
   select(any_of(c(
     "pseudo_id",
     "koen", "age_group", "age",
-    "length_group", "previous_subscriptions", "previous_campaigns", "previous_trials",
-    "fast_churn", "continued_after_campaign",
+    "previous_subscriptions", "previous_campaigns", "previous_trials",
+    "continued_after_campaign",
     
     # Adfærd
     "antal_sidevisninger",
@@ -28,16 +28,13 @@ cluster_vars_raw <- model_data %>%
     "antal_devices",
     "andel_search",
     "andel_internal",
-    "andel_email",
     "andel_social",
     "andel_indland",
     "andel_kultur",
     "andel_sport",
     "andel_erhverv",  
     "andel_forside",
-    "gns_sider_pr_dag",  
-    
-    "type"
+    "gns_sider_pr_dag"
   )))
 
 # Vi har nu valgt de relevante variabler, som skal indgå i vores klyngeanalyse.
