@@ -629,17 +629,6 @@ print(cv_sammenligning2)
 
 # 15. Konklusion ----------------------------------------------------------
 
-# Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
-# fortsætter efter kampagneperioden (churn eller ej). Vi har brugt korrekt 
-# feature engineering og fjernet dataleakage, og lavet tre forskellige 
-# klassifikationsmodeller. XGBoost modellen opnår den højeste AUC på 78,5% 
-# og dermed den bedste balance mellem sensitivitet og specificitet, hvor den 
-# finder 75,0% af churnerne og 70,8% af de kunder der fortsætter. Random 
-# Forest har en AUC på 77,1% og finder 94,2% af churnerne, men kun 44,3% af 
-# ikke-churnerne — en ubalance der gør den mindre egnet. Logistisk regression 
-# er den svageste model med AUC på 66,9%. Vi har valgt XGBoost da den har den 
-# bedste balance mellem sensitivitet og specificitet.
-
 # 16. Gem filer til Power BI ----------------------------------------------
 write.csv(risk_list_m2, "data/model2_risiko_liste.csv", row.names = FALSE)
 write.csv(risk_table_m2, "data/model2_risiko_tabel.csv", row.names = FALSE)
