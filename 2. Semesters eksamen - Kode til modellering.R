@@ -179,7 +179,6 @@ full_data <- sub_cancel %>%
 
 
 # 9. Variabler til klyngeanalyse  -----------------------------------------
-view(behavior_agg)
 behavior_agg <- behavior %>%
   mutate(
     er_artikel    = str_detect(page_url_clean, "ECE\\d{8}"),
@@ -195,7 +194,6 @@ behavior_agg <- behavior %>%
       str_detect(page_url_clean, "/debat/")          ~ "debat",
       str_detect(page_url_clean, "/politik/")        ~ "politik",
       str_detect(page_url_clean, "/rejser/")         ~ "rejser",
-      str_detect(page_url_clean, "/viden/")          ~ "viden",
       str_detect(page_url_clean, "/biler/")          ~ "biler",
       page_url_clean == "https://jyllands-posten.dk/" ~ "forside",
       TRUE ~ "andet"
@@ -220,7 +218,6 @@ behavior_agg <- behavior %>%
     
     andel_search        = mean(refr_medium == "search"),
     andel_internal      = mean(refr_medium == "internal"),
-    andel_email         = mean(refr_medium == "email"),
     andel_social        = mean(refr_medium == "social"),
     
     andel_indland       = mean(sektion == "indland"),
@@ -232,8 +229,9 @@ behavior_agg <- behavior %>%
     andel_debat         = mean(sektion == "debat"),
     andel_politik       = mean(sektion == "politik"),
     andel_rejser        = mean(sektion == "rejser"),
-    andel_viden         = mean(sektion == "viden"),
     andel_forside       = mean(sektion == "forside"),
+    andel_biler         = mean(sektion == "biler"),
+    andel_andet         = mean(sektion == "andet"),
     
     gns_sider_pr_dag    = n() / n_distinct(dato),
     
@@ -241,7 +239,7 @@ behavior_agg <- behavior %>%
   ) %>%
   mutate(across(everything(), ~replace_na(.x, 0)))
 
-
+view(behavior_agg)
 # 10. Gem det rensede datasæt -------------------------------------------------
 saveRDS(behavior_agg, "data/datasæt_konstruerede_variabler.rds")
 saveRDS(full_data, "data/renset_datasæt.rds")
@@ -251,3 +249,27 @@ full_data %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   write.table("data/renset_data.csv",
               sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+
+
+# Tjek unikke værdier i refr_medium
+unique(behavior$refr_medium)
+
+# Tjek om viden faktisk forekommer i URLs
+sum(str_detect(behavior$page_url_clean, "/viden/"), na.rm = TRUE)
+sum(behavior$refr_medium == "email", na.rm = TRUE)
+behavior %>% 
+  filter(refr_medium == "email") %>% 
+  select(pseudo_id, refr_medium) %>% 
+  head(10)
+
+
+behavior_agg %>% 
+  filter(andel_email > 0) %>% 
+  nrow()
+
+
+behavior_agg %>%
+  select(starts_with("andel_")) %>%
+  summarise(across(everything(), mean)) %>%
+  pivot_longer(everything(), names_to = "variabel", values_to = "gennemsnit") %>%
+  arrange(desc(gennemsnit))
