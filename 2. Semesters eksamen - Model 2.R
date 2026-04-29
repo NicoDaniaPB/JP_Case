@@ -54,22 +54,23 @@ model2_data <- model2_data %>%
 
 # Vi opretter nu nogle nye features, som skal være med til at øge modellens 
 # forklaringskraft. Udover det, så fjerner vi også NA-værdierne. 
+# Vi opretter nu nogle nye features, som skal være med til at øge modellens 
+# forklaringskraft. Udover det.
+# Vi bruger pipeline-operatoren til at bygge videre på "model2_data". Vi bruger
+# mutate til at bygge nogle features, som skal styrke modellens forklaringsgrad.
 model2_data <- model2_data %>%
   mutate(
     days_since_user_created = as.numeric(difftime(order_date, usr_created, units = "days")),
     age_at_order = as.numeric(difftime(order_date, birthdate, units = "days")) / 365,
     total_previous_engagement = previous_subscriptions + previous_campaigns + previous_trials,
-    has_previous_subscriptions = ifelse(previous_subscriptions > 0, 1, 0)
   )
-# Vi bruger pipeline-operatoren til at bygge videre på "model2_data". Vi bruger
-# mutate til at bygge nogle features, som skal styrke modellens forklaringsgrad. 
 
 # 4. Udvælgelse af variabler ------------------------------------------
 model2_data <- model2_data %>%
   select(
     # Demografiske
     koen,
-    age,
+    age_at_order,
     
     # Abonnementshistorik
     previous_subscriptions,
@@ -93,9 +94,6 @@ model2_data <- model2_data %>%
     
     # Feature engineered
     days_since_user_created,
-    age_at_order,
-    total_previous_engagement,
-    has_previous_subscriptions,
     
     # Target
     churn_10
@@ -116,7 +114,41 @@ train_index2 <- createDataPartition(model2_data$churn_10, p = 0.8, list = FALSE)
 train_data2 <- model2_data[train_index2, ]
 test_data2  <- model2_data[-train_index2, ]
 
-# 6. Logistisk regression -------------------------------------
+# Tester for multikolonaritet 
+
+findLinearCombos(train_data2 %>% select(where(is.numeric)))
+vif(glm(churn_10 ~ ., data = train_data2, family = binomial))
+
+# Vi vil nu håndtere lineære korrelerede variabler, da lineære modeller som 
+# logistisk regression ikke kan håndtere det selv. Træ-baserede modeller som 
+# Random Forest eller XGBoost kan godt håndtere det, så derfor gør vi det kun
+# for vores logistisk regression model.
+
+# Tjek for perfekt korrelerede variabler
+cor_matrix <- cor(train_data %>% select(where(is.numeric)))
+high_cor <- which(abs(cor_matrix) > 0.95 & cor_matrix != 1, arr.ind = TRUE)
+print(high_cor)
+
+
+# 6. Håndtering korrelerede variabler ----------------------------------------------------------------------
+
+# Vi vil nu håndtere lineære korrelerede variabler, da lineære modeller som 
+# logistisk regression ikke kan håndtere det selv. Træ-baserede modeller som 
+# Random Forest eller XGBoost kan godt håndtere det, så derfor gør vi det kun
+# for vores logistisk regression model.
+
+# Tjek for perfekt korrelerede variabler
+cor_matrix <- cor(train_data2 %>% select(where(is.numeric)))
+high_cor <- which(abs(cor_matrix) > 0.95 & cor_matrix != 1, arr.ind = TRUE)
+print(high_cor)
+
+# Tjek for lineær afhængighed
+findLinearCombos(train_data2 %>% select(where(is.numeric)))
+
+# Vi har nu kontrolleret for lineæreafhænigheder og behøver ikke foretager os yderligere tiltag, da der ingen er. 
+
+
+# 7. Logistisk regression -------------------------------------
 
 # Vi sikrer reproducerbarhed
 set.seed(47)
@@ -649,12 +681,12 @@ print(cv_sammenligning2)
 # kunder der fortsætter efter kampagneperioden. Modellen identificerer kunder
 # der churner inden for 10 dage efter kampagnens afslutning — typisk kunder
 # der glemte at afmelde og reagerer når de ser første betaling.
-# XGBoost er den bedste model med AUC = 0.78 og en god balance mellem
-# sensitivity (77.5%) og specificity (71.4%), hvilket gør den velegnet til
+# XGBoost er den bedste model med AUC = 0.828 og en god balance mellem
+# sensitivity (86%) og specificity (66,7%), hvilket gør den velegnet til
 # at identificere risikokunder.
-# Random Forest har lavere AUC (0.769) og lignende specificity (61.9%), men 
-# højere sensitivity på 84.5%. Denne ubaalance gør den uegnet til JP's 
-# problemstilling. Logistisk regression er ikke egnet med AUC på 0.677.
+# Random Forest har lavere AUC (0.802) og lignende specificity (81%), men 
+# lavere sensitivity på 69.8%. Denne ubaalance gør den uegnet til JP's 
+# problemstilling. Logistisk regression er ikke egnet med AUC på 0.709.
 # Den vigtigste forklarende variabel er 
 # account_active_days_before_campaign — kunder med lang historik hos JP 
 # churner markant sjældnere end nye kunder.
@@ -664,6 +696,4 @@ print(cv_sammenligning2)
 write.csv(risk_list, "model2_risiko_liste.csv", row.names = FALSE)
 write.csv(risk_table, "model2_risiko_tabel.csv", row.names = FALSE)
 write.csv(economy_table, "model2_økonomisk_besparelse.csv", row.names = FALSE)
-write.csv(xgb_imp, "model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
-
-
+write.csv(xgb_imp2, "model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
