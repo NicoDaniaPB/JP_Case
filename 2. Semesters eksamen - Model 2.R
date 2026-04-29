@@ -125,7 +125,7 @@ vif(glm(churn_10 ~ ., data = train_data2, family = binomial))
 # for vores logistisk regression model.
 
 # Tjek for perfekt korrelerede variabler
-cor_matrix <- cor(train_data %>% select(where(is.numeric)))
+cor_matrix <- cor(train_data2 %>% select(where(is.numeric)))
 high_cor <- which(abs(cor_matrix) > 0.95 & cor_matrix != 1, arr.ind = TRUE)
 print(high_cor)
 
