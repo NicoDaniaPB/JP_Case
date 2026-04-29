@@ -249,27 +249,3 @@ full_data %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   write.table("data/renset_data.csv",
               sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
-
-
-# Tjek unikke værdier i refr_medium
-unique(behavior$refr_medium)
-
-# Tjek om viden faktisk forekommer i URLs
-sum(str_detect(behavior$page_url_clean, "/viden/"), na.rm = TRUE)
-sum(behavior$refr_medium == "email", na.rm = TRUE)
-behavior %>% 
-  filter(refr_medium == "email") %>% 
-  select(pseudo_id, refr_medium) %>% 
-  head(10)
-
-
-behavior_agg %>% 
-  filter(andel_email > 0) %>% 
-  nrow()
-
-
-behavior_agg %>%
-  select(starts_with("andel_")) %>%
-  summarise(across(everything(), mean)) %>%
-  pivot_longer(everything(), names_to = "variabel", values_to = "gennemsnit") %>%
-  arrange(desc(gennemsnit))
