@@ -590,19 +590,13 @@ print(cv_sammenligning)
 # Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
 # fortsætter efter kampagneperioden (churn eller ej). Vi har brugt korrekt 
 # feature engineering og fjernet dataleakage, og lavet tre forskellige 
-# klassifikationsmodeller. XGBoost modellen opnår den højeste AUC på 817%. og 
-# dermed den bedste balance mellem sensitivity og specificity, hvor den finder
-# 81,7%  af true-positives. Det er derfor den bedste model til at forudsige 
-# churn efter kampagnen. XGBoost-model har en accuracy på 74,4%. Modellen 
-# identificerer 86,5% af churnerne og 62.6% af de kunder, der fortsætter, 
-# hvilket gør at vi vurderer den som den bedste velegnet model til at 
-# understøtte JPs problemstillinger, da den har den bedste balance mellem 
-# sensitivity og specificity. Random Forest modellen har næsten lige så høj 
-# accuracy som XGBoost, kun 0,5 procent-point i forskel. Den er bedre til at 
-# finde churnere, da den har en sensitivity på 93,3%. Men den er dårligere til
-# at finde ikke-churnere med en specifity på 55,1%. Både RF og XGBoost modellerne
-# kan bruges til JP's problemstillinger. Vi har dog valgt, at gå med XGBoost, da
-# den har den bedste balance mellem sensitivity og specificity. 
+# klassifikationsmodeller. XGBoost modellen opnår den højeste AUC på 78,5% 
+# og dermed den bedste balance mellem sensitivitet og specificitet, hvor den 
+# finder 75,0% af churnerne og 70,8% af de kunder der fortsætter. Random 
+# Forest har en AUC på 77,1% og finder 94,2% af churnerne, men kun 44,3% af 
+# ikke-churnerne — en ubalance der gør den mindre egnet. Logistisk regression 
+# er den svageste model med AUC på 66,9%. Vi har valgt XGBoost da den har den 
+# bedste balance mellem sensitivitet og specificitet.
 
 # 16. Gem som CSV-filer til Power BI ------------------------------------------
 
