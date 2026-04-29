@@ -87,18 +87,21 @@ sub_cancel <- sub_cancel %>%
 
 
 # 5. Lav churn-grupper -------------------------------------------------------
-
-sub_cancel <- sub_cancel %>%
-  mutate(
-    length_group = case_when(
-      subscription_length_days < 30 ~ "0–30 dage",
-      subscription_length_days < 90 ~ "30–90 dage",
-      subscription_length_days < 180 ~ "90–180 dage",
-      subscription_length_days < 270 ~ "180–270 dage",
-      subscription_length_days < 365 ~ "270–365 dage",
-      TRUE ~ "365+ dage"
-    )
-  )
+#
+# VI BRUGER DEN IKKE!!!
+#
+#
+# sub_cancel <- sub_cancel %>%
+#   mutate(
+#     length_group = case_when(
+#       subscription_length_days < 30 ~ "0–30 dage",
+#       subscription_length_days < 90 ~ "30–90 dage",
+#       subscription_length_days < 180 ~ "90–180 dage",
+#       subscription_length_days < 270 ~ "180–270 dage",
+#       subscription_length_days < 365 ~ "270–365 dage",
+#       TRUE ~ "365+ dage"
+#     )
+#   )
 
 
 # 6. Tilføj alder + aldersgrupper -------------------------------------------
