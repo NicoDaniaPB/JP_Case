@@ -17,10 +17,6 @@ pacman::p_load(tidyverse, lubridate, caret, pROC, randomForest, xgboost)
 # Vi indlæser dataene ved "read_rds"-funktionen
 model_data <- read_rds("data/renset_datasæt.rds")
 
-# Vi gemmer ID'er separat
-all_ids <- model_data$pseudo_id
-# Vi gør dette, så vi kan lave risiko-liste senere i koden. 
-
 # 2. Yderligere klargøring af data til modellerne -------------------------
 
 # Filtrering til kunder der FORTSÆTTER efter kampagnen
