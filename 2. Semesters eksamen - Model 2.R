@@ -697,3 +697,5 @@ write.csv(risk_list, "model2_risiko_liste.csv", row.names = FALSE)
 write.csv(risk_table, "model2_risiko_tabel.csv", row.names = FALSE)
 write.csv(economy_table, "model2_økonomisk_besparelse.csv", row.names = FALSE)
 write.csv(xgb_imp2, "model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
+# Sammenligning af modeller
+write.csv(model_sammenligning2, "data/model_sammenligning.csv", row.names = FALSE)
