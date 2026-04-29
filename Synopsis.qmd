@@ -1,0 +1,1978 @@
+---
+lang: da # Sprog (dansk)
+
+format:
+  pdf:
+    documentclass: article # LaTeX documentclass
+    toc: true # Indholdsfortegnelse (true/false)
+    toc-title: Indholdsfortegnelse # Titel på TOC (bruges kun hvis toc: true)
+    toc-depth: 3 # Hvor dybt TOC går (overskriftsniveau)
+    number-sections: true # Nummerer sektioner
+    number-depth: 3 # Nummerering ned til niveau 3
+    titlepage: true # Lav titel-side (Quarto genereret)
+    lof: false # List of figures
+    lot: false # List of tables
+
+bibliography: Kilder.bib # BibTeX-fil til kilder
+
+header-includes:
+  - \usepackage[a4paper, top=30mm, bottom=30mm, left=20mm, right=20mm, heightrounded]{geometry} # Margener
+  - \usepackage{booktabs} # Pænere tabeller
+  - \usepackage{makecell} # Bedre celler i tabeller
+  - \usepackage{pdfpages} # Mulighed for at inkludere PDF-sider
+  - \AtBeginDocument{\includepdf[pages={1}]{Forside.pdf}} # Indsæt forside som første side
+
+crossref:
+  fig-prefix: ""  # Figur prefix 
+  sec-prefix: ""  # Sektion prefix
+  tbl-prefix: ""  # Tabel prefix
+  eq-prefix: ""   # Ligning prefix
+
+editor:
+  markdown:
+    wrap: 72 # Wrap linjer ved 72 tegn i editoren
+---
+
+
+```{r}
+#| label: Setup # Giver chunken et navn/id her: Setup. 
+#| echo: false  # Viser ikke selve koden i det færdige dokument ved false og omvendt ved true, men koden kører i "baggrunden". 
+#| eval: true   # Betyder chunken skal køres ved true og omvendt ved false. 
+
+# Options
+options(OutDec = ",")
+
+# Pakker
+pacman::p_load(
+  "knitr",   # Quarto bruger knitr som engine til at eksekvere R-chunks og integrere output (resultater, tabeller, figurer).
+  "tinytex", # Gør det muligt at kompilere dokumentet til PDF via LaTeX, som automatisk installerer nødvendige LaTeX-pakker.
+  "tidyverse"# Samling af pakker til datahåndtering, transformation og visualisering (dplyr, ggplot2, tidyr, readr, tibble m.fl.)
+  ) 
+```
+
+<!-- Forklaring: -->
+
+<!-- # bruges til kapitler. Hvert nyt kapitel starter med #. -->
+
+<!-- ## bruges til afsnit inden for et kapitel. Nummereringen følger kapitelnummeret, fx 1.1, 1.2, 2.1 osv. -->
+
+<!-- ### bruges til underafsnit. Nummereringen bliver f.eks. 1.2.1, 2.1.1 osv. -->
+
+<!-- #### bruges til endnu finere opdeling, fx 2.1.2.1, 2.1.2.2 osv. -->
+
+<!-- Denne struktur gør det let at overskue og navigere i dokumentet, og den kan automatisk danne grundlag for en indholdsfortegnelse i Quarto eller andre markdown-baserede systemer. -->
+
+<!-- Fjern ikke nedenstående kode. -->
+
+<!-- Den sørger for, at der kommer en liste over figurer og en liste over -->
+<!-- tabeller først og derefter nummererede sider. -->
+
+\pagenumbering{gobble} 
+\tableofcontents 
+\newpage 
+\listoffigures 
+\listoftables 
+\newpage 
+\pagenumbering{arabic} 
+\setcounter{page}{1}
+
+## Executive summary
+
+\newpage
+
+## Problemstilling {#sec-problemstilling}
+
+### Problembeskrivelse {#sec-pf}
+
+### Afgrænsning
+
+\newpage
+
+## Juridisk Metode
+
+\newpage
+
+## Dataklargørelse
+
+Upload af relevante pakker.
+```{r}
+pacman::p_load("tidyverse", "lubridate", "readr")
+```
+
+Indlæsning af JP datafilerne. 
+```{r}
+#| message: false
+behavior <- read_csv("data/behavior.csv")
+cancellation <- read_csv("data/cancellation.csv")
+subscription2 <- read_csv("data/subscription_v2.csv")
+```
+
+Indlæsning og parsing af abonnementsdata
+```{r}
+#| message: false
+#| warning: false
+subscription2_clean <- subscription2 %>%
+  separate(
+    col = 1,
+    into = c(
+      "pseudo_id", "account_active_days", "subscription_cancel_date",
+      "order_date", "koen", "birthdate", "usr_created", "order_trackertag",
+      "permission_given_order", "permission_given_today",
+      "previous_subscriptions", "previous_campaigns", "previous_trials",
+      "first_campaign_day", "last_campaign_day",
+      "newsletters_before_order", "newsletters_after_order"), sep = ";", convert = FALSE) %>%
+  mutate(
+    subscription_cancel_date = dmy(subscription_cancel_date),
+    subscription_cancel_date = if_else(
+      subscription_cancel_date == as.Date("3000-01-01"),
+      NA_Date_,
+      subscription_cancel_date),
+    birthdate = dmy(birthdate),
+    usr_created = dmy(usr_created),
+    first_campaign_day = dmy(first_campaign_day),
+    last_campaign_day = dmy(last_campaign_day),
+
+    order_date = ymd_hms(order_date),
+
+    account_active_days = as.numeric(account_active_days),
+    previous_subscriptions = as.numeric(previous_subscriptions),
+    previous_campaigns = as.numeric(previous_campaigns),
+    previous_trials = as.numeric(previous_trials),
+    newsletters_before_order = as.numeric(newsletters_before_order),
+    newsletters_after_order = as.numeric(newsletters_after_order),
+
+    permission_given_order = as.logical(permission_given_order),
+    permission_given_today = as.logical(permission_given_today), 
+    
+    koen = if_else(koen == "" | is.na(koen), "Ukendt", koen)
+  )
+```
+
+Fjern dubletter.
+```{r}
+subscription_renset <- subscription2_clean %>%
+  group_by(pseudo_id) %>%
+  slice_max(order_date, with_ties = FALSE) %>%
+  ungroup()
+```
+
+```{r}
+cancellation_renset <- cancellation %>%
+  group_by(pseudo_id) %>%
+  slice_max(expiration_date, with_ties = FALSE) %>%
+  ungroup()
+```
+
+Merge af subscription2- og cancellationdata
+```{r}
+sub_cancel <- subscription_renset %>%
+  left_join(cancellation_renset, by = "pseudo_id")
+```
+
+Beregning af abonnementslængde.
+```{r}
+sub_cancel <- sub_cancel %>%
+  mutate(
+    end_date = if_else(
+      is.na(subscription_cancel_date),
+      Sys.Date(),
+      subscription_cancel_date
+    ),
+    subscription_length_days = as.numeric(end_date - as.Date(order_date))
+  )
+```
+
+Gruppering af abonnementslængde.
+```{r}
+sub_cancel <- sub_cancel %>%
+    mutate(
+     length_group = case_when(
+       subscription_length_days < 30 ~ "0–30 dage",
+       subscription_length_days < 90 ~ "30–90 dage",
+       subscription_length_days < 180 ~ "90–180 dage",
+       subscription_length_days < 270 ~ "180–270 dage",
+       subscription_length_days < 365 ~ "270–365 dage",
+       TRUE ~ "365+ dage"
+     )
+   )
+```
+
+Filtrering af ugyldige aldre og beregning af aldersgrupper. 
+```{r}
+sub_cancel <- sub_cancel %>%
+  filter(!is.na(birthdate)) %>%
+  filter(as.numeric(difftime(as.Date(order_date), birthdate, units = "days")) / 365 >= 18) %>%
+  mutate(
+    age = floor(time_length(interval(birthdate, today()), "years")),
+    age_group = case_when(
+      age < 25 ~ "18–24",
+      age < 35 ~ "25–34",
+      age < 45 ~ "35–44",
+      age < 55 ~ "45–54",
+      age < 65 ~ "55–64",
+      TRUE ~ "65+"
+    )
+  )
+```
+
+Oprettelse af variabler, heriblandt targetvariabler til ML-modellerne.
+```{r}
+sub_cancel <- sub_cancel %>%
+  mutate(
+    continued_after_campaign = if_else(is.na(subscription_cancel_date) | 
+                                         subscription_cancel_date > last_campaign_day, 1, 0),
+    
+    fast_churn = if_else(
+      subscription_length_days <= 3 & continued_after_campaign == 0, 1, 0),
+    
+    fast_churn_converted = if_else(
+      subscription_length_days <= 3 & continued_after_campaign == 1, 1, 0),
+    
+    churn_10 = if_else(
+      continued_after_campaign == 1 & !is.na(subscription_cancel_date) &
+        as.numeric(subscription_cancel_date - last_campaign_day) <= 10, 1, 0),
+    
+    account_active_days_before_campaign = 
+      account_active_days - as.numeric(last_campaign_day - as.Date(order_date))
+  )
+```
+
+Aggregering af behaviordata
+```{r}
+behavior_features <- behavior %>%
+  group_by(pseudo_id) %>%
+  summarise(
+    visits = n(),
+    unique_pages = n_distinct(page_url_clean),
+    restricted_views = sum(page_restricted == "yes", na.rm = TRUE),
+    restricted_ratio = restricted_views / visits,
+    avg_scroll = mean(scroll_depth, na.rm = TRUE),
+    mobile_ratio = mean(dvce_type == "Mobile"),
+    desktop_ratio = mean(dvce_type == "Computer")
+  )
+```
+
+Sammenkædning af behaviordata og håndtering af manglende værdier.
+```{r}
+full_data <- sub_cancel %>%
+  left_join(behavior_features, by = "pseudo_id") %>%
+  mutate(
+    across(c(visits, unique_pages, restricted_views,
+             restricted_ratio, avg_scroll, mobile_ratio,
+             desktop_ratio), ~replace_na(., 0)),
+    usr_created = if_else(is.na(usr_created), as.Date(order_date), usr_created),
+    type   = if_else(is.na(type) & !is.na(subscription_cancel_date), "Ukendt", type),
+    reason = if_else(is.na(reason) & !is.na(subscription_cancel_date), "Ukendt", reason),
+    expiration_date = if_else(
+      is.na(expiration_date) & !is.na(subscription_cancel_date),
+      subscription_cancel_date,
+      expiration_date
+    )
+  )
+```
+
+\newpage
+
+Konstruktion af adfærdsvariabler til klyngeanalyse.
+```{r}
+behavior_agg <- behavior %>%
+  mutate(
+    er_artikel    = str_detect(page_url_clean, "ECE\\d{8}"),
+    er_restricted = page_restricted == "yes",
+    dato          = as.Date(dt),
+    sektion = case_when(
+      str_detect(page_url_clean, "/indland/")        ~ "indland",
+      str_detect(page_url_clean, "/international/")  ~ "international",
+      str_detect(page_url_clean, "/sport/")          ~ "sport",
+      str_detect(page_url_clean, "/erhverv/")        ~ "erhverv",
+      str_detect(page_url_clean, "/kultur/")         ~ "kultur",
+      str_detect(page_url_clean, "/livsstil/")       ~ "livsstil",
+      str_detect(page_url_clean, "/debat/")          ~ "debat",
+      str_detect(page_url_clean, "/politik/")        ~ "politik",
+      str_detect(page_url_clean, "/rejser/")         ~ "rejser",
+      str_detect(page_url_clean, "/biler/")          ~ "biler",
+      page_url_clean == "https://jyllands-posten.dk/" ~ "forside",
+      TRUE ~ "andet")) %>%
+  group_by(pseudo_id) %>%
+  summarise(
+    antal_sidevisninger = n(),
+    antal_unikke_dage   = n_distinct(dato),
+    antal_unikke_sider  = n_distinct(page_url_clean),
+    antal_artikler      = sum(er_artikel),
+    gns_scroll          = mean(scroll_depth, na.rm = TRUE),
+    andel_restricted    = mean(er_restricted),
+    
+    er_mobil_primær = {
+      t <- table(dvce_type)
+      if (length(t) == 0) NA_integer_
+      else as.integer(names(which.max(t)) == "Mobile")
+    },
+    
+    antal_devices       = n_distinct(dvce_type),
+    
+    andel_search        = mean(refr_medium == "search"),
+    andel_internal      = mean(refr_medium == "internal"),
+    andel_social        = mean(refr_medium == "social"),
+    
+    andel_indland       = mean(sektion == "indland"),
+    andel_international = mean(sektion == "international"),
+    andel_sport         = mean(sektion == "sport"),
+    andel_erhverv       = mean(sektion == "erhverv"),
+    andel_kultur        = mean(sektion == "kultur"),
+    andel_livsstil      = mean(sektion == "livsstil"),
+    andel_debat         = mean(sektion == "debat"),
+    andel_politik       = mean(sektion == "politik"),
+    andel_rejser        = mean(sektion == "rejser"),
+    andel_forside       = mean(sektion == "forside"),
+    andel_biler         = mean(sektion == "biler"),
+    andel_andet         = mean(sektion == "andet"),
+    
+    gns_sider_pr_dag    = n() / n_distinct(dato),
+    
+    .groups = "drop") %>%
+  mutate(across(everything(), ~replace_na(.x, 0)))
+```
+
+Gem det rensede datasæt.
+```{r}
+saveRDS(behavior_agg, "data/datasæt_konstruerede_variabler.rds")
+saveRDS(full_data, "data/renset_datasæt.rds")
+
+full_data %>%
+  mutate(across(where(is.Date), ~ as.character(.x))) %>%
+  mutate(across(everything(), ~ ifelse(is.na(.x), "", .x))) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/renset_data.csv",
+              sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+```
+
+\newpage
+
+## Modellering - Klyngeanalyse
+
+### Dataklargøring til modellering
+
+Upload af relevante pakker. 
+```{r}
+pacman::p_load("tidyverse", "cluster", "janitor")
+```
+
+Datasættene indlæses. 
+```{r}
+model_data <- readRDS("data/renset_datasæt.rds")
+behavior_agg <- readRDS("data/datasæt_konstruerede_variabler.rds")
+```
+
+Join af adfærdsvariabler.
+```{r}
+model_data <- model_data %>%
+  left_join(behavior_agg, by = "pseudo_id")
+```
+
+ndledende udvælgelse af klyngevariabler.
+```{r}
+cluster_vars_raw <- model_data %>% 
+  select(any_of(c(
+    "pseudo_id",
+    # Demografi
+    "koen", "age_group", "age",
+    # Historik
+    "previous_subscriptions", "previous_campaigns", "previous_trials",
+    # Adfærd
+    "antal_sidevisninger", "antal_unikke_sider", "gns_sider_pr_dag",
+    "andel_restricted", "gns_scroll",
+    # Platform
+    "er_mobil_primær", "antal_devices",
+    # Content
+    "andel_search", "andel_internal", "andel_social",
+    "andel_indland", "andel_kultur", "andel_sport",
+    "andel_erhverv", "andel_forside"
+  )))
+```
+
+Klargøring og transformation af variabler.
+```{r}
+cluster_vars <- cluster_vars_raw %>% 
+  drop_na() %>% 
+  mutate(
+    across(where(is.character), as.factor),
+    across(where(is.logical), as.factor),
+    # Transformationer af skæve variabler
+    antal_sidevisninger = log1p(antal_sidevisninger),
+    gns_sider_pr_dag = log1p(gns_sider_pr_dag)
+  )
+```
+
+### Klyngeanalyse
+
+Beregning af Gower distance.
+```{r}
+gower_dist <- daisy(cluster_vars %>% select(-pseudo_id), metric = "gower")
+```
+
+Hierarkisk clustering og dendrogram.
+```{r}
+hc <- hclust(gower_dist, method = "ward.D2")
+plot(hc, main = "Hierarkisk clustering – kundetyper")
+rect.hclust(hc, k = 4, border = "red")
+```
+
+Tilføjelse af klyngelabels. 
+```{r}
+k <- 4
+cluster_vars <- cluster_vars %>% 
+  mutate(cluster = factor(cutree(hc, k = k)))
+```
+
+Join af klyngelabels til datasættet . 
+```{r}
+model_data <- model_data %>% 
+  left_join(cluster_vars %>% select(pseudo_id, cluster) %>% distinct(), 
+            by = "pseudo_id")
+```
+
+Fjernelse af observationer uden klynge. 
+```{r}
+model_data_clean <- model_data %>% filter(!is.na(cluster))
+```
+
+### Klyngeprofiler
+
+Oprettelse af klyngeprofil. 
+```{r}
+cluster_profile <- model_data_clean %>% 
+  group_by(cluster) %>% 
+  summarise(
+    across(where(is.numeric), ~ round(mean(.x, na.rm = TRUE), 2)),
+    across(where(is.character), ~ names(sort(table(.), decreasing = TRUE))[1]),
+    .groups = "drop"
+  )
+```
+
+Outcome profilering per klynge.
+```{r}
+cluster_outcomes <- model_data_clean %>% 
+  group_by(cluster) %>% 
+  summarise(
+    n = n(),
+    fast_churn_rate = mean(fast_churn, na.rm = TRUE),
+    retention_rate = mean(continued_after_campaign, na.rm = TRUE),
+    avg_subscription_length = mean(subscription_length_days, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+### Visualisering
+
+MDS visualisering af klynger
+```{r}
+mds <- cmdscale(gower_dist, k = 2, eig = TRUE)
+mds_df <- data.frame(
+  Dim1 = mds$points[,1],
+  Dim2 = mds$points[,2],
+  cluster = cluster_vars$cluster
+)
+
+ggplot(mds_df, aes(Dim1, Dim2, color = cluster)) +
+  geom_point(alpha = 0.7, size = 2) +
+  theme_minimal() +
+  labs(title = "MDS-visualisering af Gower-baserede klynger",
+       x = "Dimension 1", y = "Dimension 2")
+```
+
+### em som CSV-filer til Power BI
+
+Eksport af resultater til Power BI
+```{r}
+write_csv(cluster_profile, "data/klynge_profiler.csv")
+write_csv(model_data_clean, "data/model_data_med_klynger.csv")
+write_csv(mds_df, "data/mds_coordinates.csv")
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+\newpage
+
+## Modellering - Chrun i kampagnen 
+
+### Dataklargøring til modellering
+
+Upload af relevante pakker.
+```{r}
+pacman::p_load("tidyverse", "lubridate", "caret", "randomForest", "xgboost", "pROC")
+```
+
+Indlæsning af JP-data.
+```{r}
+model_data_raw <- read_rds("data/renset_datasæt.rds")
+```
+
+Datoformatering.
+```{r}
+model_data <- model_data_raw %>%
+  mutate(
+    order_date = as.Date(order_date),
+    usr_created = as.Date(usr_created),
+    subscription_cancel_date = as.Date(subscription_cancel_date),
+    birthdate = as.Date(birthdate)
+  )
+```
+
+Konvertering af target variabel til factor.
+```{r}
+model_data <- model_data %>%
+  mutate(
+    continued_after_campaign = factor(
+      continued_after_campaign,
+      levels = c(0, 1),
+      labels = c("No", "Yes")))
+```
+
+Feature engineering. Konstruktion af nye prædiktorer (x-variabler).
+```{r}
+model_data <- model_data %>%
+  mutate(
+    days_since_user_created = as.numeric(order_date - usr_created),
+    age_at_order = as.numeric(difftime(order_date, birthdate, units = "days")) / 365,
+    permission_user = ifelse(permission_given_order == TRUE, 1, 0),
+    total_previous_engagement = previous_subscriptions + previous_campaigns + previous_trials,
+    has_previous_subscriptions = ifelse(previous_subscriptions > 0, 1, 0),
+    engagement_score = (visits * 0.4) + (unique_pages * 0.3) + (avg_scroll * 0.3),
+    age_engagement_interaction = age_at_order * engagement_score,
+    permission_engagement = permission_user * engagement_score
+  ) %>%
+  drop_na()
+```
+
+Fjernelse af leakage-variabler samt overflødige variabler. 
+```{r}
+model_data <- model_data %>%
+  select(
+    -subscription_cancel_date,
+    -end_date,
+    -expiration_date,
+    -newsletters_after_order,
+    -fast_churn,
+    -subscription_length_days,
+    -length_group,
+    -type,
+    -order_date,
+    -usr_created,
+    -birthdate,
+    -first_campaign_day,
+    -last_campaign_day,
+    -account_active_days,
+    -churn_10,
+    -order_trackertag,  
+    -reason,
+    -permission_given_today,
+    -age
+  )
+```
+
+pseudo_id gemmes i en separat vektor inden variablen fjernes fra datasættet, da den ikke må indgå som prædiktor i modellerne, men skal bruges senere til at knytte churn sandsynligheder tilbage til de specifikke kunder. 
+```{r}
+pseudo_ids <- model_data$pseudo_id
+model_data <- model_data %>% select(-pseudo_id)
+```
+
+Sikrer reproducerbarhed med set.seed.
+```{r}
+set.seed(47)
+```
+
+Trænings- og testopsplitning (80/20). 
+```{r}
+train_index <- createDataPartition(model_data$continued_after_campaign, p = 0.8, list = FALSE)
+train_data <- model_data[train_index, ]
+test_data  <- model_data[-train_index, ]
+```
+
+Gem pseudo ID'er for testdata. 
+```{r}
+test_ids <- pseudo_ids[-train_index]
+```
+
+### Håndtering korrelerede variabler
+
+Kontrollerer for høt korrelerede variabler.
+```{r}
+cor_matrix <- cor(train_data %>% select(where(is.numeric)))
+high_cor <- which(abs(cor_matrix) > 0.95 & cor_matrix != 1, arr.ind = TRUE)
+```
+
+Identifikation af variabler til fjernelse.
+```{r}
+findLinearCombos(train_data %>% select(where(is.numeric)))
+```
+
+Udtræk af numeriske variabler.
+```{r}
+num_vars <- train_data %>% select(where(is.numeric))
+```
+
+\newpage
+
+Lineært afhængige variabler fjernes.
+```{r}
+vars_to_remove <- colnames(num_vars)[c(17, 19)]
+```
+
+Oprettelse af datasæt til logistisk regression uden lineært afhængige variabler.
+```{r}
+train_data_log_reg <- train_data %>% select(-all_of(vars_to_remove))
+test_data_log_reg  <- test_data %>% select(-all_of(vars_to_remove))
+```
+
+Verifikation af lineær uafhængigheder. 
+```{r}
+findLinearCombos(train_data_log_reg %>% select(where(is.numeric)))
+```
+
+```{r}
+set.seed(47)
+```
+
+### Opsætning af cross-validation kontrol til modelevaluering. 
+```{r}
+cv_ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+```
+
+### Logistisk Regression
+
+Træning af logistisk regression med cross-validation. 
+```{r}
+#| warning: false
+log_cv <- train(
+  continued_after_campaign ~ .,
+  data = train_data_log_reg,
+  method = "glm",
+  family = binomial,
+  trControl = cv_ctrl,
+  metric = "ROC"
+)
+```
+
+Træning af endelig logistisk regressionsmodel
+```{r}
+log_model <- glm(
+  continued_after_campaign ~ ., 
+  data = train_data_log_reg,
+  family = binomial
+)
+```
+
+Forudsigelse af sandsynligheder på testdata.
+```{r}
+log_prob <- predict(log_model, test_data_log_reg, type = "response")
+```
+
+\newpage
+
+Beregning af ROC-kurve. 
+```{r}
+#| message: false
+roc_log <- roc(test_data_log_reg$continued_after_campaign, log_prob)
+```
+
+Bestemmelse af optimalt threshold. 
+```{r}
+cut_log <- as.numeric(coords(roc_log, "best", ret = "threshold"))
+```
+
+Konvertering af sandsynligheder til klasser. 
+```{r}
+log_pred <- ifelse(log_prob > cut_log, "Yes", "No") %>%
+  factor(levels = c("No", "Yes"))
+```
+
+Beregning af confusion matrix
+```{r}
+cm_log <- confusionMatrix(log_pred, test_data$continued_after_campaign)
+```
+
+\newpage
+
+### Random Forest
+
+```{r}
+set.seed(47)
+```
+
+Træning af Random Forest med cross-validation. 
+```{r}
+rf_cv <- train(
+  continued_after_campaign ~ .,
+  data = train_data,
+  method = "rf",
+  trControl = cv_ctrl,
+  metric = "ROC",
+  tuneLength = 5
+)
+```
+
+Træning af endelig Random Forest model.
+```{r}
+rf_model <- randomForest(
+  continued_after_campaign ~ .,
+  data = train_data,
+  ntree = 500,
+  mtry = floor(sqrt(ncol(train_data) - 1)),
+  importance = TRUE
+)
+```
+
+Forudsigelse af sandsynligheder på testdata.
+```{r}
+rf_prob <- predict(rf_model, test_data, type = "prob")[,2]
+```
+
+Beregning af ROC-kurve.
+```{r}
+#| message: false
+roc_rf <- roc(test_data$continued_after_campaign, rf_prob)
+```
+
+Bestemmelse af optimalt threshold. 
+```{r}
+cut_rf <- as.numeric(coords(roc_rf, "best", ret = "threshold"))
+```
+
+Konvertering af sandsynligheder til klasser. 
+```{r}
+rf_pred <- ifelse(rf_prob > cut_rf, "Yes", "No") %>%
+  factor(levels = c("No", "Yes"))
+```
+
+Beregning af confusion matrix. 
+```{r}
+cm_rf <- confusionMatrix(rf_pred, test_data$continued_after_campaign)
+```
+
+\newpage
+
+### XGBoost
+
+Konvertering til numerisk matrix.
+```{r}
+full_matrix <- model.matrix(continued_after_campaign ~ . - 1, data = model_data)
+```
+
+Opdeling af matrix i trænings- og testdata.
+```{r}
+train_matrix <- full_matrix[train_index, ]
+test_matrix  <- full_matrix[-train_index, ]
+```
+
+ Udtræk af target-variabel for træningsdata. 
+```{r}
+y_train <- model_data$continued_after_campaign[train_index]
+```
+
+Oprettelse af DMatrix til XGBoost. 
+```{r}
+dtrain <- xgb.DMatrix(data = train_matrix, label = as.numeric(y_train) - 1)
+dtest  <- xgb.DMatrix(data = test_matrix,  label = as.numeric(model_data$continued_after_campaign[-train_index]) - 1)
+```
+
+```{r}
+set.seed(47)
+```
+
+```{r}
+#| include: false
+options(OutDec = ".")
+```
+
+Cross-validation af XGBoost.
+```{r}
+xgb_cv2 <- xgb.cv(
+  data = dtrain,
+  nrounds = 300,
+  params = list(
+    max_depth = 4,
+    eta = 0.05,
+    subsample = 0.8,
+    colsample_bytree = 0.8,
+    objective = "binary:logistic",
+    eval_metric = "auc"
+  ),
+  nfold = 5,
+  verbose = 0
+)
+```
+
+Træning af endelig XGBoost model.
+```{r}
+xgb_model <- xgb.train(
+  data = dtrain,
+  nrounds = 300,
+  params = list(
+    max_depth = 4,
+    eta = 0.05,
+    subsample = 0.8,
+    colsample_bytree = 0.8,
+    objective = "binary:logistic",
+    eval_metric = "auc"
+  )
+)
+```
+
+```{r}
+#| include: false
+options(OutDec = ",")
+```
+
+Forudsigelse af sandsynligheder på testdata. 
+```{r}
+xgb_prob <- predict(xgb_model, dtest)
+```
+
+Beregning af ROC-kurve.
+```{r}
+#| message: false
+roc_xgb <- roc(test_data$continued_after_campaign, xgb_prob)
+```
+
+Bestemmelse af optimalt threshold. 
+```{r}
+cut_xgb <- as.numeric(coords(roc_xgb, "best", ret = "threshold"))
+```
+
+Konvertering af sandsynligheder til klasser.
+```{r}
+xgb_pred <- ifelse(xgb_prob > cut_xgb, "Yes", "No") %>%
+  factor(levels = c("No", "Yes"))
+```
+
+Beregning af confusion matrix.
+```{r}
+cm_xgb <- confusionMatrix(xgb_pred, test_data$continued_after_campaign)
+```
+
+\newpage
+
+### Tabel over mest risikable kunder
+
+Oprettelse af risikotibble.
+```{r}
+risk_list <- tibble(
+  pseudo_id = test_ids,
+  churn_probability = xgb_prob,
+  predicted_class = xgb_pred
+)
+```
+
+Sortering efter churn sandsynlighed.
+```{r}
+risk_list_sorted <- risk_list %>%
+  arrange(desc(churn_probability))
+```
+
+Opbygning af endelig risikotabel. 
+```{r}
+risk_table <- risk_list_sorted %>%
+  mutate(
+    churn_risk_pct = round(churn_probability * 100, 1),
+    risk_group = case_when(
+      churn_probability >= 0.75 ~ "Høj risiko",
+      churn_probability >= 0.50 ~ "Middel risiko",
+      TRUE ~ "Lav risiko")) %>%
+  select(
+    pseudo_id,
+    churn_risk_pct,
+    predicted_class,
+    risk_group)
+```
+
+\newpage
+
+### Økonomisk analyse af churn-kampagne
+
+Definition af listepris.
+```{r}
+JP_pris <- 199  
+```
+
+Filtrering af højrisikokunder.
+```{r}
+high_risk <- risk_list_sorted %>% 
+  filter(churn_probability > 0.75)
+```
+
+Optælling af højrisiko-kunder.
+```{r}
+n_high_risk <- nrow(high_risk)
+```
+
+Beregning af økonomisk værdi for tre scenarier. 
+```{r}
+uplift_5 <- 0.05
+saved_5 <- n_high_risk * uplift_5
+value_3m_5  <- saved_5 * JP_pris * 3
+value_6m_5  <- saved_5 * JP_pris * 6
+value_12m_5 <- saved_5 * JP_pris * 12
+```
+
+```{r}
+uplift_15 <- 0.15
+saved_15 <- n_high_risk * uplift_15
+value_3m_15  <- saved_15 * JP_pris * 3
+value_6m_15  <- saved_15 * JP_pris * 6
+value_12m_15 <- saved_15 * JP_pris * 12
+```
+
+```{r}
+uplift_25 <- 0.25
+saved_25 <- n_high_risk * uplift_25
+value_3m_25  <- saved_25 * JP_pris * 3
+value_6m_25  <- saved_25 * JP_pris * 6
+value_12m_25 <- saved_25 * JP_pris * 12
+```
+
+Oprettelse af økonomisk overblikstabel.
+```{r}
+economy_table <- tibble(
+  scenario = c("5% (Worst case)", "15% (Realistisk)", "25% (Optimistisk)"),
+  højrisiko_kunder = n_high_risk,
+  reddede_kunder = round(c(saved_5, saved_15, saved_25)),
+  besparelse_3m = round(c(value_3m_5, value_3m_15, value_3m_25)),
+  besparelse_6m = round(c(value_6m_5, value_6m_15, value_6m_25)),
+  besparelse_12m = round(c(value_12m_5, value_12m_15, value_12m_25))
+)
+```
+
+\newpage
+
+### Sammenligning af modeller
+
+Udtræk af AUC-værdier. 
+```{r}
+auc_log <- as.numeric(pROC::auc(roc_log))
+auc_rf  <- as.numeric(pROC::auc(roc_rf))
+auc_xgb <- as.numeric(pROC::auc(roc_xgb))
+```
+
+Oprettelse af modelsamnligningstabel. 
+```{r}
+model_sammenligning <- tibble(
+  Model       = c("Logistisk regression", "Random Forest", "XGBoost"),
+  AUC         = round(c(auc_log, auc_rf, auc_xgb), 4),
+  Accuracy    = round(c(
+    cm_log$overall["Accuracy"],
+    cm_rf$overall["Accuracy"],
+    cm_xgb$overall["Accuracy"]
+  ), 4),
+  Sensitivity = round(c(
+    cm_log$byClass["Sensitivity"],
+    cm_rf$byClass["Sensitivity"],
+    cm_xgb$byClass["Sensitivity"]
+  ), 4),
+  Specificity = round(c(
+    cm_log$byClass["Specificity"],
+    cm_rf$byClass["Specificity"],
+    cm_xgb$byClass["Specificity"]
+  ), 4)
+)
+```
+
+```{r}
+knitr::kable(
+  model_sammenligning,
+  caption = "Sammenligning af modeller — Model 1 (churn ved kampagneslut)",
+  col.names = c("Model", "AUC", "Accuracy", "Sensitivitet", "Specificitet")
+)
+```
+
+Visualisering af ROC-kurver.
+```{r}
+plot(roc_log, col = "steelblue", lwd = 2,
+     main = "ROC-kurver — Model 1 (churn ved kampagneslut)")
+plot(roc_rf,  col = "darkgreen", lwd = 2, add = TRUE)
+plot(roc_xgb, col = "firebrick", lwd = 2, add = TRUE)
+legend("bottomright",
+       legend = c(
+         paste0("Logistisk regression (AUC = ", round(auc_log, 3), ")"),
+         paste0("Random Forest        (AUC = ", round(auc_rf,  3), ")"),
+         paste0("XGBoost              (AUC = ", round(auc_xgb, 3), ")")
+       ),
+       col = c("steelblue", "darkgreen", "firebrick"),
+       lwd = 2)
+```
+
+Udtræk af variabelvigtighed fra Random Forest. 
+```{r}
+rf_imp <- importance(rf_model) %>%
+  as.data.frame() %>%
+  rownames_to_column("variabel") %>%
+  arrange(desc(MeanDecreaseGini))
+```
+
+Visualisering af variabelvigtighed i Random Forest modellen. 
+```{r}
+rf_imp %>%
+  slice_head(n = 15) %>%
+  ggplot(aes(x = reorder(variabel, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_col(fill = "darkgreen", alpha = 0.8) +
+  coord_flip() +
+  labs(
+    title = "Variabelvigtighed — Random Forest (Model 1)",
+    subtitle = "MeanDecreaseGini: hvor meget variablen reducerer usikkerhed på tværs af træer",
+    x = NULL,
+    y = "MeanDecreaseGini"
+  ) +
+  theme_minimal()
+```
+
+Udtræk af variabelvigtighed fra XGBoost. 
+```{r}
+xgb_imp <- xgb.importance(model = xgb_model) %>%
+  as_tibble()
+```
+
+Visualisering af variabelvigtighed i XGBoost modellen. 
+```{r}
+xgb_imp %>%
+  slice_head(n = 15) %>%
+  ggplot(aes(x = reorder(Feature, Gain), y = Gain)) +
+  geom_col(fill = "firebrick", alpha = 0.8) +
+  coord_flip() +
+  labs(
+    title = "Variabelvigtighed — XGBoost (Model 1)",
+    subtitle = "Gain: hvor meget hver variabel forbedrer modellens præcision",
+    x = NULL,
+    y = "Gain"
+  ) +
+  theme_minimal()
+```
+
+### Cross-validation sammenligning
+
+Udtræk af cross-validation resultater fra logistisk regression.
+```{r}
+log_cv_results <- log_cv$results %>%
+  select(ROC, Sens, Spec) %>%
+  slice(which.max(ROC)) %>%
+  mutate(Model = "Logistisk regression")
+```
+
+Udtræk af cross-validation resultater fra Random Forest.
+```{r}
+rf_cv_results <- rf_cv$results %>%
+  select(ROC, Sens, Spec) %>%
+  slice(which.max(ROC)) %>%
+  mutate(Model = "Random Forest")
+```
+
+Udtræk af cross-validation resultater fra XGBoost.
+```{r}
+xgb_cv_results <- tibble(
+  Model = "XGBoost",
+  ROC   = max(xgb_cv2$evaluation_log$test_auc_mean),
+  Sens  = NA,   # xgb.cv giver ikke Sens/Spec direkte
+  Spec  = NA
+)
+```
+
+Sammenstilling af cross-validation resultater.
+```{r}
+cv_sammenligning <- bind_rows(
+  log_cv_results,
+  rf_cv_results,
+  xgb_cv_results) %>%
+  select(Model, ROC, Sens, Spec)
+```
+
+### Gem som CSV-filer til Power BI
+
+```{r}
+risk_list %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/risiko_liste.csv",
+              sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+```
+
+```{r}
+write.csv(economy_table, "data/økonomisk_besparelse.csv", row.names = FALSE)
+```
+
+```{r}
+xgb_imp %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/xgb_variabel_vigtighed.csv",
+              sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+```
+
+```{r}
+model_data_raw %>%
+  select(pseudo_id, continued_after_campaign, koen, age, age_group) %>%
+  write.table("data/kampagne_oversigt.csv",
+              sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+```
+
+## Modellering - Chrun kort tid efter kampagnen
+
+### Dataklargøring til modellering
+
+Upload af relevante pakker. 
+```{r}
+pacman::p_load("tidyverse", "lubridate", "caret", "pROC", "randomForest", "xgboost")
+```
+
+Indlæsning af JP-data.
+```{r}
+model_data <- read_rds("data/renset_datasæt.rds")
+```
+
+Filtrering til kunder der fortsætter efter kampagnen. 
+```{r}
+model2_data <- model_data %>%
+  filter(continued_after_campaign == 1)
+```
+
+Gem pseudo ID'er separat for hele datasættet.
+```{r}
+model2_ids <- model2_data$pseudo_id
+```
+
+Konvertering af target variabelen til en factor.
+```{r}
+model2_data <- model2_data %>%
+  mutate(
+    churn_10 = factor(
+      churn_10,
+      levels = c(0, 1),
+      labels = c("No", "Yes")
+    )
+  )
+```
+
+Feature engineering. Konstruktion af nye prædiktorer (x-variabler).
+```{r}
+model2_data <- model2_data %>%
+  mutate(
+    days_since_user_created = as.numeric(difftime(order_date, usr_created, units = "days")),
+    age_at_order = as.numeric(difftime(order_date, birthdate, units = "days")) / 365
+  )
+```
+
+Udvælgelse af variabler til modellering. 
+```{r}
+model2_data <- model2_data %>%
+  select(
+    # Demografiske
+    koen,
+    age_at_order,
+    
+    # Abonnementshistorik
+    previous_subscriptions,
+    previous_campaigns,
+    previous_trials,
+    account_active_days_before_campaign,
+    
+    # Permission og nyhedsbreve
+    permission_given_order,
+    newsletters_before_order,
+    newsletters_after_order,
+    
+    # Adfærd de første 30 dage (ingen leakage – kampagnen er 2 måneder)
+    visits,
+    unique_pages,
+    restricted_views,
+    restricted_ratio,
+    avg_scroll,
+    mobile_ratio,
+    desktop_ratio,
+    
+    # Feature engineered
+    days_since_user_created,
+    
+    # Target
+    churn_10
+  ) 
+```
+
+Sikrer reproducerbarhed med set.seed.
+```{r}
+set.seed(47)
+```
+
+Trænings- og testopsplitning (80/20).
+```{r}
+train_index2 <- createDataPartition(model2_data$churn_10, p = 0.8, list = FALSE)
+train_data2 <- model2_data[train_index2, ]
+test_data2  <- model2_data[-train_index2, ]
+```
+
+### Håndtering korrelerede variabler
+
+Kontrol af højt korrelerede variabler.
+```{r}
+cor_matrix2 <- cor(train_data2 %>% select(where(is.numeric)))
+high_cor2 <- which(abs(cor_matrix2) > 0.95 & cor_matrix2 != 1, arr.ind = TRUE)
+```
+
+Identifikation af lineært afhængige variabler. 
+```{r}
+findLinearCombos(train_data2 %>% select(where(is.numeric)))
+```
+
+### Opsætning af cross-validation kontrol til modelevaluering.
+
+```{r}
+set.seed(47)
+```
+
+Definition af cross-validation parametre.
+```{r}
+cv_ctrl2 <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+```
+
+### Logistisk Regression
+
+Træning af logistisk regression med cross-validation.
+```{r}
+log_cv2 <- train(
+  churn_10 ~ .,
+  data = train_data2,
+  method = "glm",
+  family = binomial,
+  trControl = cv_ctrl2,
+  metric = "ROC"
+)
+```
+
+Træning af endelig logistisk regressionsmodel.
+```{r}
+log_model2 <- glm(churn_10 ~ ., data = train_data2, family = binomial)
+```
+
+Forudsigelse af sandsynligheder på testdata.
+```{r}
+log_prob2 <- predict(log_model2, test_data2, type = "response")
+```
+
+Beregning af ROC-kurve.
+```{r}
+roc_log2 <- roc(test_data2$churn_10, log_prob2)
+```
+
+Bestemmelse af optimalt threshold. 
+```{r}
+cut_log2 <- as.numeric(coords(roc_log2, "best", ret = "threshold"))
+```
+
+Konvertering af sandsynligheder til klasser og beregning af confusion matrix.
+```{r}
+log_pred2 <- ifelse(log_prob2 > cut_log2, "Yes", "No") %>%
+  factor(levels = c("No", "Yes"))
+
+cm_log2 <- confusionMatrix(log_pred2, test_data2$churn_10)
+```
+
+
+### Random Forest
+
+```{r}
+set.seed(47)
+```
+
+Træning af Random Forest med cross-validation.
+```{r}
+rf_cv2 <- train(
+  churn_10 ~ .,
+  data = train_data2,
+  method = "rf",
+  trControl = cv_ctrl2,
+  metric = "ROC",
+  tuneLength = 5
+)
+```
+
+Træning af endelig Random Forest model. 
+```{r}
+rf_model2 <- randomForest(
+  churn_10 ~ .,
+  data = train_data2,
+  ntree = 500,
+  mtry = floor(sqrt(ncol(train_data2) - 1)),
+  importance = TRUE
+)
+```
+
+Forudsigelse af sandsynligheder på testdata.
+```{r}
+rf_prob2 <- predict(rf_model2, test_data2, type = "prob")[,2]
+```
+
+Beregning af ROC-kurve. 
+```{r}
+roc_rf2 <- roc(test_data2$churn_10, rf_prob2)
+```
+
+Bestemmelse af optimalt threshold.
+```{r}
+cut_rf2 <- as.numeric(coords(roc_rf2, "best", ret = "threshold"))
+```
+
+Konvertering af sandsynligheder til klasser.
+```{r}
+rf_pred2 <- ifelse(rf_prob2 > cut_rf2, "Yes", "No") %>%
+  factor(levels = c("No", "Yes"))
+```
+
+Beregning af confusion matrix.
+```{r}
+cm_rf2 <- confusionMatrix(rf_pred2, test_data2$churn_10)
+```
+
+### XGBoost
+
+Konvertering til numerisk matrix.
+```{r}
+full_matrix_m2 <- model.matrix(churn_10 ~ . - 1, data = model2_data)
+```
+
+Konvertering af target-variabel til numerisk format.
+```{r}
+full_label_m2 <- as.numeric(model2_data$churn_10) - 1
+```
+
+Opdeling af matrix i trænings- og testdata.
+```{r}
+train_matrix_m2 <- full_matrix_m2[train_index2, ]
+test_matrix_m2  <- full_matrix_m2[-train_index2, ]
+```
+
+Udtræk af target variabelen for træningsdata.
+```{r}
+y_train_m2 <- model2_data$churn_10[train_index2]
+```
+
+Opdeling af labels i trænings- og testdata.
+```{r}
+train_label_m2 <- full_label_m2[train_index2]
+test_label_m2  <- full_label_m2[-train_index2]
+```
+
+Oprettelse af DMatrix til XGBoost.
+```{r}
+dtrain_m2 <- xgb.DMatrix(data = train_matrix_m2, label = as.numeric(y_train_m2) - 1)
+dtest_m2  <- xgb.DMatrix(data = test_matrix_m2,
+                         label = as.numeric(model2_data$churn_10[-train_index2]) - 1)
+```
+
+```{r}
+set.seed(47)
+```
+
+```{r}
+#| include: false
+options(OutDec = ".")
+```
+
+Cross-validation af XGBoost.
+```{r}
+xgb_cv_m2 <- xgb.cv(
+  params = list(
+    max_depth = 4,
+    eta = 0.05,
+    subsample = 0.8,
+    colsample_bytree = 0.8,
+    objective = "binary:logistic",
+    eval_metric = "auc"
+  ),
+  data = dtrain_m2,
+  nrounds = 300,
+  nfold = 5,
+  verbose = 0
+)
+```
+
+Træning af endelig XGBoost model.
+```{r}
+xgb_model2 <- xgb.train(
+  params = list(
+    max_depth = 4,
+    eta = 0.05,
+    subsample = 0.8,
+    colsample_bytree = 0.8,
+    objective = "binary:logistic",
+    eval_metric = "auc"
+  ),
+  data = dtrain_m2,
+  nrounds = 300
+)
+```
+
+```{r}
+#| include: false
+options(OutDec = ",")
+```
+
+Forudsigelse af sandsynligheder på testdata.
+```{r}
+xgb_prob2 <- predict(xgb_model2, dtest_m2)
+```
+
+Beregning af ROC-kurve. 
+```{r}
+roc_xgb2 <- roc(test_data2$churn_10, xgb_prob2)
+```
+
+Bestemmelse af optimalt threshold. 
+```{r}
+cut_xgb2 <- as.numeric(coords(roc_xgb2, "best", ret = "threshold"))
+```
+
+Konvertering af sandsynligheder til klasser.
+```{r}
+xgb_pred2 <- ifelse(xgb_prob2 > cut_xgb2, "Yes", "No") %>%
+  factor(levels = c("No", "Yes"))
+```
+
+Beregning af confusion matrix.
+```{r}
+cm_xgb2 <- confusionMatrix(xgb_pred2, test_data2$churn_10)
+```
+
+### Tabel over mest risikable kunder
+
+Opdeling af pseudo-ID'er i trænings- og testdata
+```{r}
+train_ids_m2 <- model2_ids[train_index2]
+test_ids_m2  <- model2_ids[-train_index2]
+```
+
+Oprettelse af risikotibble. 
+```{r}
+risk_list_m2 <- tibble(
+  pseudo_id = test_ids_m2,
+  churn_probability = xgb_prob2,
+  predicted_class = xgb_pred2
+)
+```
+
+Sortering efter churn sandsynlighed.
+```{r}
+risk_list_sorted_m2 <- risk_list_m2 %>%
+  arrange(desc(churn_probability))
+```
+
+Opbygning af endelig risikotabel.
+```{r}
+risk_table_m2 <- risk_list_sorted_m2 %>%
+  mutate(
+    churn_risk_pct = round(churn_probability * 100, 1),
+    risk_group = case_when(
+      churn_probability >= 0.75 ~ "Høj risiko",
+      churn_probability >= 0.50 ~ "Middel risiko",
+      TRUE ~ "Lav risiko")) %>%
+  select(
+    pseudo_id,
+    churn_risk_pct,
+    predicted_class,
+    risk_group
+  )
+```
+
+### Økonomisk analyse af churn efter kampagnen
+
+Definition af listepris
+```{r}
+JP_pris <- 199  
+```
+
+Filtrering af højrisiko-kunder
+```{r}
+high_risk_m2 <- risk_list_sorted_m2 %>% 
+  filter(churn_probability > 0.75)
+n_high_risk_m2 <- nrow(high_risk_m2)
+```
+
+Beregning af økonomisk værdi 5% uplift (worst case).
+```{r}
+saved_5_m2   <- n_high_risk_m2 * 0.05
+value_3m_5_m2  <- saved_5_m2 * JP_pris * 3
+value_6m_5_m2  <- saved_5_m2 * JP_pris * 6
+value_12m_5_m2 <- saved_5_m2 * JP_pris * 12
+```
+
+Beregning af økonomisk værdi 15% uplift (realistisk).
+```{r}
+saved_15_m2   <- n_high_risk_m2 * 0.15
+value_3m_15_m2  <- saved_15_m2 * JP_pris * 3
+value_6m_15_m2  <- saved_15_m2 * JP_pris * 6
+value_12m_15_m2 <- saved_15_m2 * JP_pris * 12
+```
+
+Beregning af økonomisk værdi 25% uplift (optimistisk).
+```{r}
+saved_25_m2   <- n_high_risk_m2 * 0.25
+value_3m_25_m2  <- saved_25_m2 * JP_pris * 3
+value_6m_25_m2  <- saved_25_m2 * JP_pris * 6
+value_12m_25_m2 <- saved_25_m2 * JP_pris * 12
+
+```
+
+Oprettelse af økonomisk overblikstabel. 
+```{r}
+economy_table_m2 <- tibble(
+  scenario = c("5% (Worst case)", "15% (Realistisk)", "25% (Optimistisk)"),
+  højrisiko_kunder = n_high_risk_m2,
+  reddede_kunder = round(c(saved_5_m2, saved_15_m2, saved_25_m2)),
+  besparelse_3m = round(c(value_3m_5_m2, value_3m_15_m2, value_3m_25_m2)),
+  besparelse_6m = round(c(value_6m_5_m2, value_6m_15_m2, value_6m_25_m2)),
+  besparelse_12m = round(c(value_12m_5_m2, value_12m_15_m2, value_12m_25_m2))
+)
+```
+
+### Sammenligning af modeller¨
+
+Udtræk af AUC værdierne for modellerne.
+```{r}
+auc_log2 <- as.numeric(pROC::auc(roc_log2))
+auc_rf2  <- as.numeric(pROC::auc(roc_rf2))
+auc_xgb2 <- as.numeric(pROC::auc(roc_xgb2))
+```
+
+Oprettelse af modelsammenligningtabel.
+```{r}
+model_sammenligning2 <- tibble(
+  Model       = c("Logistisk regression", "Random Forest", "XGBoost"),
+  AUC         = round(c(auc_log2, auc_rf2, auc_xgb2), 4),
+  Accuracy    = round(c(
+    cm_log2$overall["Accuracy"],
+    cm_rf2$overall["Accuracy"],
+    cm_xgb2$overall["Accuracy"]
+  ), 4),
+  Sensitivity = round(c(
+    cm_log2$byClass["Sensitivity"],
+    cm_rf2$byClass["Sensitivity"],
+    cm_xgb2$byClass["Sensitivity"]
+  ), 4),
+  Specificity = round(c(
+    cm_log2$byClass["Specificity"],
+    cm_rf2$byClass["Specificity"],
+    cm_xgb2$byClass["Specificity"]
+  ), 4)
+)
+```
+
+```{r}
+knitr::kable(
+  model_sammenligning2,
+  caption = "Sammenligning af modeller — Model 2 (churn inden for 10 dage efter kampagneslut)",
+  col.names = c("Model", "AUC", "Accuracy", "Sensitivitet", "Specificitet")
+)
+```
+
+Visualisering af ROC-kurver.
+```{r}
+plot(roc_log2, col = "steelblue", lwd = 2,
+     main = "ROC-kurver — Model 2 (churn_10 efter kampagneslut)")
+plot(roc_rf2,  col = "darkgreen", lwd = 2, add = TRUE)
+plot(roc_xgb2, col = "firebrick", lwd = 2, add = TRUE)
+legend("bottomright",
+       legend = c(
+         paste0("Logistisk regression (AUC = ", round(auc_log2, 3), ")"),
+         paste0("Random Forest        (AUC = ", round(auc_rf2,  3), ")"),
+         paste0("XGBoost              (AUC = ", round(auc_xgb2, 3), ")")
+       ),
+       col = c("steelblue", "darkgreen", "firebrick"),
+       lwd = 2)
+```
+
+Udtræk af variabelvigtighed fra Random Forest.
+```{r}
+rf_imp2 <- importance(rf_model2) %>%
+  as.data.frame() %>%
+  rownames_to_column("variabel") %>%
+  arrange(desc(MeanDecreaseGini))
+```
+
+Visualisering af variabelvigtighed i Random Forest modellen.
+```{r}
+rf_imp2 %>%
+  slice_head(n = 15) %>%
+  ggplot(aes(x = reorder(variabel, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_col(fill = "darkgreen", alpha = 0.8) +
+  coord_flip() +
+  labs(
+    title = "Variabelvigtighed — Random Forest (Model 2)",
+    subtitle = "MeanDecreaseGini: hvor meget variablen reducerer usikkerhed på tværs af træer",
+    x = NULL,
+    y = "MeanDecreaseGini"
+  ) +
+  theme_minimal()
+```
+
+Udtræk af variabelvigtighed fra XGBoost. 
+```{r}
+xgb_imp2 <- xgb.importance(model = xgb_model2) %>%
+  as_tibble()
+```
+
+Visualisering af variabelvigtighed i XGBoost modellen.
+```{r}
+xgb_imp2 %>%
+  slice_head(n = 15) %>%
+  ggplot(aes(x = reorder(Feature, Gain), y = Gain)) +
+  geom_col(fill = "firebrick", alpha = 0.8) +
+  coord_flip() +
+  labs(
+    title = "Variabelvigtighed — XGBoost (Model 2)",
+    subtitle = "Gain: hvor meget hver variabel forbedrer modellens præcision",
+    x = NULL,
+    y = "Gain"
+  ) +
+  theme_minimal()
+```
+
+\newpage 
+
+### Cross-validation sammenligning
+
+Udtræk af cross-validation resultater fra logistisk regression.
+```{r}
+log_cv2_results <- log_cv2$results %>%
+  select(ROC, Sens, Spec) %>%
+  slice(which.max(ROC)) %>%
+  mutate(Model = "Logistisk regression")
+```
+
+Udtræk af cross-validation resultater fra Random Forest.
+```{r}
+rf_cv2_results <- rf_cv2$results %>%
+  select(ROC, Sens, Spec) %>%
+  slice(which.max(ROC)) %>%
+  mutate(Model = "Random Forest")
+```
+
+Udtræk af cross-validation resultater fra XGBoost.
+```{r}
+xgb_cv2_results <- tibble(
+  Model = "XGBoost",
+  ROC   = max(xgb_cv_m2$evaluation_log$test_auc_mean),
+  Sens  = NA,   # xgb.cv giver ikke Sens/Spec direkte
+  Spec  = NA
+)
+```
+
+Sammenstilling af cross-validation resultater. 
+```{r}
+cv_sammenligning2 <- bind_rows(
+  log_cv2_results,
+  rf_cv2_results,
+  xgb_cv2_results) %>%
+  select(Model, ROC, Sens, Spec)
+```
+
+### em som CSV-filer til Power BI
+
+Eksport af resultater til Power BI.
+```{r}
+write.csv(risk_list_m2, "data/model2_risiko_liste.csv", row.names = FALSE)
+write.csv(risk_table_m2, "data/model2_risiko_tabel.csv", row.names = FALSE)
+write.csv(economy_table_m2,"data/model2_økonomisk_besparelse.csv", row.names = FALSE)
+write.csv(xgb_imp2, "data/model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
+write.csv(model_sammenligning2,"data/model2_sammenligning.csv", row.names = FALSE)
+```
+
+\newpage 
+
+## Væsentligste konklusioner
+
+\newpage
+
+## Literaturliste
+
+::: {#refs}
+:::
+
+\newpage
+
+
+\appendix
+
+Eksempler på afsnit i bilag:
+
+## Dataforståelse (CRISP-DM)
+
+### Forretningsforståelse
+Afklare formål, behov og succeskriterier (hvorfor laver vi analysen?).
+
+### Dataforståelse
+Indsamle data, få overblik, undersøge datakvalitet og finde mønstre.
+
+### Dataklargøring
+Rense, strukturere og omforme data, så det er klar til analyse/modellering.
+
+### Modellering
+Udvikle og træne modeller samt justere parametre.
+
+### Evaluering
+Vurdere om modellen/resultatet er korrekt og brugbart ift. forretningsmålet.
+
+### Implementering 
+Sætte løsningen i drift: rapport, dashboard, automatisering eller system
+
+## Dataklargørelse
+
+### Hente data fra Superstats og gør dem tidy
+
+### Hente data fra DMI og gør dem tidy
+
+### Hente data fra nager.at og gør dem tidy
+
+### Hente Bjarnes data og gør dem tidy
+
+### RSQLight
+
+### Download joinet datasæt, formatér behørigt, og gør data klar til preprocessing
+
+### Preprocess - dan flere variabler og lav ét datasæt uden missing med en række for hver hjemmekamp, og fjern alle variabler, som ikke skal indgå i
+
+## Modellering - herunder opdeling i et trænings- og testdatasæt - med et seed = jeres holdnummer.
+
+### Stor model - linenær regression med alle variabler
+
+### Lasso / Ridge - husk at bruge CV til at optimere lambda
+
+### Subset selection metoder (brug mindst én)
+
+### Sammenlign på validation de forskellige MSE fra hver model
+
+## Evaluering
+
+### Hvordan er Test-MSE sammenlignet med CV-MSE
+
+### Fortokning
+
+### Prædiktion på nye data (fx best-case/worst-case scenario for de første kampe i foråret)
+
+### Sammenlign resultatet med formålet med undersøgelsen.
+
+## Eksempler på markdown-sproget
+
+### Her hentes et billede 
+
+![Faserne i CRISP-DM.](crisp-dm.png){#fig-crispdm width="40%"}
+
+Her er et eksempel på anvendelse af en png fil, som skal ligge i dit
+working directory. Tekst mellem [] er figurteksten, som du øsnker i
+din opgave. Tekst mellem () er (placering og) navn på figuren. Tekst
+mellem {} er et henvisningsnavn, som du kan bruge til at henvise til
+figuren i din tekst. 
+
+### Referencer 
+Her er et eksempel på en figur, som jeg henviser til [@fig-bnp_pr_capita] . 
+En figur som JEG har lavet længere nede i koden.
+
+Sådan henviser/refererer du til en figur: [@fig-crispdm] (Billedet fra før).
+
+Her et eksempel med en tabel [@tbl-sammenfat], som JEG har lavet længere nede.
+
+Her er noget tekst blabla, og nu vil jeg gerne lave en reference til afsnit
+[@sec-problemstilling].
+
+Reference f.eks. fra interviews bla.bla..bla...
+[@transskriberede_interviews] eller en bog [@bang_2025] osv.
+
+Reference til en ligning: @eq-forecasting
+
+$$\hat{T}_{t} = \frac{1}{m} \sum_{j=-k}^k y_{t+j}$$ {#eq-forecasting}
+
+Jeg kan også referere til f.eks. en værdi, som jeg har udregnet i en kode
+chunk:
+
+```{r}
+#| label: r_squared
+#| echo: false
+# Indlæs data og lav lineær regression
+library(ggplot2)
+model <- lm(hwy ~ displ, data = mpg)
+r2 <- summary(model)$r.squared
+
+```
+
+I forbindelse med den simple lineære regression er $R^2 =$
+`r round(r2, 2)`
+
+Lav gerne mange kode chuncks i stedet for at have lange chunks - det giver et bedre overblik. Indholdet i en kode chunk skal være sammenhængende. Men lav gerne flere i forbindelse med fx, at du laver en Lasso regression.
+
+
+
+```{r}
+#| label: Pakker og snik snak
+#| include: false
+
+# Tilføj kun de pakker, du har brug for, hvilket jeg ikke har gjort, da jeg har taget nogle irrelevante med. 
+pacman::p_load(tidyverse, caret, janitor, glue, leaps, car, glmnet, boot, feasts, fable, tsibbledata, forecast, fpp2, fpp3, fabletools)
+
+```
+
+<!-- Her har jeg brugt ctrl+shift+c for at udkommentere -->
+
+<!-- Hvis echo = TRUE, vises koden. -->
+
+<!-- Hvis echo = FALSE, skjules koden, men output vises stadig. -->
+
+<!-- Hvis eval = TRUE, køres koden. -->
+
+<!-- Hvis eval = FALSE, køres koden ikke, og der kommer derfor intet output fra chunken. -->
+
+<!-- include bestemmer, om både kode og output fra chunken skal inkluderes i det færdige dokument. -->
+
+<!-- Hvis include = FALSE, køres koden stadig (medmindre eval=FALSE), men hverken kode eller output vises i dokumentet. -->
+
+<!-- Dette er nyttigt, hvis du vil udføre noget "bag kulisserne" (f.eks. indlæse data), uden at det vises for læseren. -->
+
+<!-- echo: Skal koden vises? -->
+
+<!-- eval: Skal koden køres? -->
+
+<!-- include: Skal kode og output inkluderes i dokumentet? -->
+
+
+
+<!-- default for de tre vigtigste chunk options i RMarkdown/Quarto er: -->
+<!-- echo: TRUE - Koden vises som standard i dokumentet. -->
+<!-- eval: TRUE - Koden køres som standard. -->
+<!-- include: TRUE - Både kode og output inkluderes som standard i det færdige dokument. -->
+
+<!-- Prøv at ændre på include, eval, echo mv... -->
+
+```{r}
+#| label: fig-bnp_pr_capita
+#| message: false
+#| warning: false
+#| echo: false
+#| fig-cap: Australsk BNP pr capita
+#| fig-width: 4.5
+#| fig-height: 2
+
+global_economy |>
+  filter(Country == "Australia") |>
+  autoplot(GDP/Population) +
+  labs(title= "GDP pr capita", y = "$US")
+
+```
+<!-- "fig-bnp_pr_capita" er unikke navn til at lave reference med -->
+<!-- "Australsk BNP pr capita" er tekst til figuren -->
+
+
+```{r}
+#| label: tbl-sammenfat
+#| message: false
+#| warning: false
+#| echo: false
+#| tbl-cap: Outliers og indflydelsesrige observationer.
+
+sammenfat <- data.frame(
+  "observation" = c("16", "17", "39", "117"),
+  "outlier" = c("Ja", "Ja", "Nej", "Nej"),
+  "hoj_leverage" = c("Nej", "Nej", "Ja", "Ja"),
+  indflydelsesrig = c("Nej", "Nej", "Nej", "Ja"),
+  reference = c(
+    "Residuals vs Fitted, Q-Q Plot, Scale-Location, Boxplot",
+    "Residuals vs Fitted, Q-Q Plot, Scale-Location",
+    "Residuals vs Leverage",
+    "Residuals vs Leverage (Cook's Distance)"
+  )
+)
+
+colnames(sammenfat) <- c("Observation", "Outlier", "Høj leverage", "Indflydelsesrig observation", "Reference til plot")
+
+knitr::kable(sammenfat)
+
+```
+<!-- "tbl-sammenfat" er unikke navn til at lave reference med -->
+<!-- "Australsk BNP pr capita" er tekst til tabellen -->
+
+
+## Fed og kursiv, og punktform
+
+-   **Daniel** Daniel skreved med fed skrift
+    -   *Olga* Olga skrevet i kursiv
+        - ***Palle*** Palle skrevet med fed skrift og i kursiv
+
+"-" angiver punktform - bemærk de forskellige niveauer
+
+## Formler (m.m)
+
+### Gennemsnit
+
+Gennemsnittet af y: de obsaverede (faktiske) værdier.
+$$\bar{y} = \frac{1}{n}\sum_{i=1}^{n}y_i$$
+
+
+
