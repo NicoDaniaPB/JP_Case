@@ -137,8 +137,148 @@ okumentation for overholdelse af dataminimeringsprincippet som er en direkte
 kobling mellem dataanalyse og juridisk compliance. JP’s delvise overholdelse af 
 art. 5. samt de væsentligste mangler analyseres i Bilag, afsnit 3.
 
+### Behandlingsgrundlag og interesseafvejning
+Abonnementsadministration kan behandles på grundlag af kontraktopfyldelse 
+jf. art. 6. stk. 1, litra b. churn profilering udgør derimod et nyt formål, 
+som kræver selvstændig hjemmel. Legitim interesse litra f, kan udgøre lovligt 
+grundlag, men forudsætter også at JP gennemfører og dokumenterer en 
+interesseafvejning (LIA – legitimate interest assessment). JP’s interesse i at 
+fastholde abonnenter er konkret og saglig og en churn model vurderes til at 
+være et proportionelt virkemiddel, en grovere demografisk segmenteringsmodel 
+ville forstyrre en bredere gruppe, og give værre præcision. Abonnenter kan med 
+rimelighed ikke forvente at data som eksempel scrolldybde og devicetype 
+anvendes til individuel profilering, hvilket udgør en modvægt i afvejningen. 
+Den legitime interesse kræver en opdateret privatlivspolitik samt en reel 
+indsigelsesmulighed jf. art. 21.
+Det er derudover afgørende at holde markedsføringssamtykket strengt adskilt 
+fra GDPR behandlingsgrundlaget. Samtykke til elektronisk markedsføring efter 
+markedsføringsloven §10 er ikke identisk med GDPR retligt behandlingsgrundlag 
+og de to regelsæt må ikke sammenblandes. Den fulde interesseafvejning fremgår 
+af bilag, afsnit 4.
+
+### Automatiseret beslutningstagning
+JP’s churn modeller genererer en sandsynlighedsscore pr abonnent, som benyttes 
+til beslutningsstøtte. Så længe JP’s medarbejdere foretager en substantiel og 
+ikke blot formel vurdering forud for enhver retention beslutning, finder 
+GDPR art. 22. ikke anvendelse. Hvis tildelingen af fastholdelsestilbud 
+automatiseres direkte fra modellens output uden menneskelig prøvelse, aktiveres 
+art. 22. og JP skal sikre ret til menneskelig indgriben, indsigt i 
+beslutningslogikken og mulighed for at bestride afgørelsen jf. art. 22. stk. 3.
+Analysen fremgår af Bilag, afsnit 5.
+
+### AI-forordningen
+JP’s churn modeller, opbygget med logistisk regression, random forest & XGBoost
+udgør AI systemer i AI Act forstand jf. art. 3, nr 1. Modellerne falder hverken
+indenfor de forbudte kategorier i art. 5. eller højrisiko kategorierne i 
+bilag III og klassificeres derfor som begrænset risiko (niveau 3) jf. art. 50. 
+Derudover bemærkes det, at størstedelen af AI Acts forpligtelser først finder 
+fuld anvendelse fra August 2026, mens transparenskravene allerede er relevante; 
+abonnenter skal informeres om profilering og derfor bør JP dokumentere 
+modellernes formål og datagrundlag. Den fulde risikoklassificering fremgår af
+Bilag, afsnit 6.
+
+### Bias og ligebehandling
+Da alder og køn indgår som forklarende variable i modellerne, er der risiko for
+der sker systematisk indirekte diskrimination over for grupper med beskyttede 
+karakteristika. JP bør løbende evaluere modellernes sensitivitet og specificitet
+på tværs af demografiske grupper. Såfremt systematisk skæv behandling 
+identificeres, bør relevante variable rekonstrueres eller fjernes helt, hvilket
+er et tiltag som understøtter dataminimeringsprincippet i art. 5. stk. 1, 
+litra c. Bilag, afsnit 7.
+
+### Cybersikkerhed og behandlingssikkerhed
+Sikkerhedsbrud i JP’s systemer ville potentielt muliggøre reidentifikation af 
+samtlige registrerede. Pseudonymisering er utilstrækkeligt som eneste 
+sikkerhedsforanstaltning. JP bør supplere med kryptering i hvile og under 
+transmission, rollebaseret adgangsstyring med logning og dokumenterede 
+procedurer for sikkerhedsbrud, herunder underretning til Datatilsynet inden 72 
+timer jf. art. 33. og til de registrerede jf. art. 34. Som en stor digital 
+medieudbyder kan JP desuden falde indenfor NIS2 direktivets anvendelsesområde, 
+som blandt andet pålægger indledende underretningspligt inden 24 timer ved 
+væsentlige hændelser. ISO/IEC 27001 certificering anbefales som dokumentation 
+for et systematisk informationssikkerhedsstyringssystem. Bilag, afsnit 8.
+
+### Markedsføringsloven og registreredes rettigheder
+JP’s retention kommunikation henter typisk hjemmel i undtagelsen for 
+eksisterende kundeforhold (soft opt-in) jf. markedsføringsloven §10 med 
+forudsætning af, at der gives en klar og tydelig frameldingsmulighed. Trækker 
+en abonnent sit samtykke tilbage, skal JP omgående stoppe med direkte 
+markedsføring, mens behandling til øvrige formål kan fortsætte under dettes 
+selvstændige hjemmelgrundlag. JP bør også implementere tilgængelige, 
+lavpraktiske procedurer for udøvelse af de registrerede rettigheder; indsigt 
+(art. 15) berigtigelse (art. 16) sletning (art. 17) og indsigelse mod behandling
+baseret på legitim interesse, som er særligt relevant for churn profilering jf.
+art. 21. Bilag, afsnit 9.
+
+### Samlede juridiske anbefalinger
+På baggrund af ovenstående analyse, anbefales det, at JP iværksætter og sikrer 
+følgende tiltag:
+
+- Udarbejdelse og dokumentation af en LIA (Legitimate Interest Assessment) for 
+churn profilering, inden behandlingen påbegyndes eller videreføres
+
+- Opdater privatlivspolitikken til eksplicit at omtale profileringen og
+churn modellering, herunder opfyld oplysningspligten over for abonnenter ved 
+dataindsamlingens tidspunkt jf. art. 13, stk. 2, litra f. ikke blot ved 
+opdatering af hjemmesiden privatlivspolitik.
+
+- Fastsæt konkrete opbevaringsfrister og implementer sletningsprocedurer for 
+rådata, efter modellerne er trænet og valideret, jf. art. 5. stk. 1, litra e.
+Anvend PCA, VIF test & klyngeanalyse til dokumenteret reduktion af variable, 
+som teknisk argumentation for sikker overholdelse af dataminimeringsprincippet.
+
+- Sikre substantiel menneskelig prøvelse af modellernes outputs, forud for 
+enhver beslutning om retention for at undgå aktivering af art. 22.
+
+- Evaluering af modellernes outputs på tværs af demografiske grupper, og undgå 
+systematisk bias ved at rekonstruere eller fjerne kritiske variable.
+
+- Supplering af pseudonymisering med kryptering, rollebaseret adgangsstyring og 
+dokumenterede procedurer i overensstemmelse med art. 32 & NIS2
+
+- Forberedelse af fuld AI Act compliance inden august 2026, hvor dokumentation 
+af modellernes formål, datagrundlag og transparensforpligtelser over for 
+abonnenter indgår.
 
 \newpage
+
+## Metode og videnskabsteori
+Projektet tager udgangspunkt i et kritisk realistisk paradigme, da kunde churns 
+kan påvirkes af flere underliggende mekanismer og betragtes som et observerbart
+fænomen. Kritisk realisme tager i denne sammenhæng udgangspunkt i, at de 
+mekanismer, der driver kundeadfærd og churn i JP’s abonnementsforretning, 
+eksisterer uafhængigt af analysen, men kun kan afdækkes indirekte gennem 
+empiriske data. Indsigt i disse mekanismer opnås derfor ved at analysere 
+brugerdata fra JP’s digitale platforme og anvende statistiske modeller, som kan
+identificere mønstre i f.eks. kundernes scrolling adfærd, engagement og 
+generelle abonnement dynamikker. I forhold til ontologi anses churns som et 
+systematisk fænomen frem for en  tilfældig hændelse, kundernes frafald påvirkes 
+af identificerbare faktorer relateret til deres adfærd og oplevelse af 
+produktet. Det anerkendes dog, at ikke alle relevante mekanismer kan observeres 
+direkte, og at uobserverede forhold f.eks. individuelle præferencer eller 
+eksterne markedsforhold kan spille en rolle. I forhold til et epistemologisk 
+perspektiv baseres viden i projektet på empiriske analyser af historiske 
+kundedata, hvor machine learning anvendes til at afdække mønstre og relationer 
+mellem forklarende variabler og churns. Modellerne anvendes til at identificere,
+hvilke faktorer der har mest betydning i forhold til kundetab. Metodisk anlægges
+en kvantitativ tilgang med udgangspunkt i sekundære data fra JP’s datakilder. 
+De anvendte modeller er bygget op på et positivistisk fundament, da de forsøger
+at kvantificere sammenhænge og generalisere på tværs af observationer. 
+Undersøgelsesdesignet er deduktivt, da etablerede machine learning metoder
+anvendes til at teste modellernes evne til at forudsige churns. Der indgår også 
+abduktive elementer, hvor resultaterne bruges til løbende at justere featurevalg
+og til at fortolke potentielle sammenhænge. Datagrundlaget består primært af 
+kvantitative variabler såsom brugerfrekvens, engagementsniveau og 
+abonnementsoplysninger, og er suppleret med kvalitative indsigter fra JP, der 
+kan bidrage til en mere nuanceret forståelse.
+
+
+Til modellering anvendes klassifikationsalgoritmer, der estimerer sandsynligheden for churn. Validiteten sikres gennem test på data, mens reliabiliteten understøttes af en konsistent og reproducerbar analyseproces. Resultaternes kvalitet afhænger i høj grad af datagrundlaget og de valgte features, hvilket understreger betydningen af en god  datarensning. 
+
+
+
+\newpage
+
 
 ## Dataklargørelse
 
@@ -417,7 +557,7 @@ model_data <- model_data %>%
   left_join(behavior_agg, by = "pseudo_id")
 ```
 
-Udvælgelse af variabler der skal bruges til klyngeanalyse-algoritmen. 
+Udvælgelse af variabler til algoritmen.
 ```{r}
 cluster_vars_raw <- model_data %>% 
   select(any_of(c(
@@ -437,6 +577,9 @@ cluster_vars_raw <- model_data %>%
     "andel_erhverv", "andel_forside"
   )))
 ```
+Vi har nu udvalgt de variabler, der skal anvendes til vores 
+klyngeanalyse-algoritme.
+
 
 Klargøring og transformation af variabler.
 ```{r}
@@ -509,34 +652,60 @@ cluster_profile <- model_data_clean %>%
   )
 ```
 Forklaring af klyngerne:
-Klynge 1 – “De tunge, men ustabile brugere”
-- Høj aktivitet: mange sidevisninger, mange unikke sider og høj brug af 
-restricted-indhold.
-- Primært desktop-brugere.
-- Moderat alder (omkring 60 år).
-- Lav retention efter kampagne og relativt høj churn.
-- Læser især indland og forside.
 
-Klynge 2 – “De lavengageret der hurtigt falder fra”
-- Lav aktivitet: få besøg, få sider og lav scroll.
-- Meget høj mobilandel (70 % eller mere).
-- Lav retention og høj churn.
-- Læser primært forside og indland.
-- Kort abonnementsperiode.
+Klynge 1 – Moderat engagerede med forhøjet churn
 
-Klynge 3 – “De engagerede, modne kvalitetslæsere med god fastholdelse"
-- Høj aktivitet: mange besøg, mange artikler og høj scroll.
-- Blandet device-brug (både mobil og desktop).
-- Høj retention (ca. 68 %) og lav churn.
-- Læser bredt: indland, forside, sport, social m.m.
-- Moden alder (ca. 58–59 år).
+- Moderat aktivitetsniveau målt ved antal sidevisninger og unikke sider  
 
-Klynge 4 – “De ekstremt loyale langtidssubscribers”
-- Meget lang abonnementsperiode (over 1.100 dage i gennemsnit).
-- 100 % retention efter kampagne.
-- Ingen churn.
-- Høj aktivitet og bred læseadfærd.
-- Blandet device-brug.
+- Relativt høj brug af restricted indhold  
+
+- Primært desktop-baseret brug  
+
+- Moderat aldersprofil (ca. 50–55 år)  
+
+- Relativt høj churn-rate sammenlignet med øvrige klynger  
+
+- Læser primært indland og forside  
+
+Klynge 2 – Lavt engagerede mobilbrugere med svag fastholdelse
+
+- Lav aktivitet med få besøg, begrænset antal sidevisninger og lav scroll-dybde
+
+- Overvejende mobilbrug (meget høj mobilandel)  
+
+- Relativt lav retention og tegn på ustabil abonnementsadfærd  
+
+- Kortere abonnementsperioder  
+
+- Fokus på forside og indlandsstof  
+
+Klynge 3 – Højt engagerede læsere med stabil fastholdelse
+
+- Meget højt aktivitetsniveau med mange sidevisninger, artikler og besøg  
+
+- Lavere gennemsnitlig scroll-dybde, hvilket indikerer bredere frem for dybere 
+læsning  
+
+- Blandet device-brug (mobil og desktop)  
+
+- Relativt høj retention og lav churn-rate  
+
+- Bred læseadfærd på tværs af indholdskategorier 
+
+- Moderat aldersprofil  
+
+Klynge 4 – Loyale abonnenter med stabil adfærd
+
+- Højt aktivitetsniveau og relativt mange sidevisninger  
+
+- Primært desktop-baseret brug  
+
+- Relativt høj retention og lav churn-rate  
+
+- Stabil abonnementsadfærd over tid  
+
+- Bred, men mindre intensiv læseprofil end klynge 3  
+
 
 Klynge 2 har den højeste churn-risiko, mens klynge 4 har den laveste.
 Der er en tydelig sammenhæng mellem aktivitet og churn. Det kan ses, at høj 
@@ -1894,7 +2063,8 @@ xgb_imp2 %>%
   theme_minimal()
 ```
 
-\newpage 
+\newpage
+
 
 ### Cross-validation sammenligning
 
@@ -1975,6 +2145,7 @@ model_sammenligning2 %>%
   mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
   write.table("data/model2_sammenligning.csv",
               sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
+```
 
 \newpage 
 
