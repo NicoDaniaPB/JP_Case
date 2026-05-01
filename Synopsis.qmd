@@ -81,14 +81,62 @@ pacman::p_load(
 \newpage
 
 ## Problemstilling {#sec-problemstilling}
+En høj churn-rate påvirker JP’s økonomiske stabilitet og dens vækstmuligheder.
+En høj churn-værdi øger JP’s behov for konstant at tiltrække nye kunder, da den
+tilbagevendende indtægt reduceres. Samtidigt indikerer en høj churn-rate, at
+produktværdien fanger forbrugerens opmærksomhed, men ikke skaber den 
+tilstrækkelige værdi i et konkurrencepræget marked hvor der er mulighed for 
+at få samme kampagnetilbud ved en konkurrent eller finde andre gratis 
+alternativer.Problemstillingen er derfor at identificere årsagerne til churn 
+blandt digitale abonnementer og hvordan de kan øge kundeloyalitet og 
+fastholdelsesprocenten.
 
 ### Problembeskrivelse {#sec-pf}
+JP oplever et stort frafald blandt de kunder, som starter gennem et 
+kampagneabonnement (2 måneder for 49 kr.). En signifikant del af disse kunder 
+opsiger deres abonnement under kampagnen eller umiddelbart efter 
+kampagneperioden og vælger ikke at fortsætte til standardprisen.
+Dette betyder, at JP’s ikke anvender deres ressourcer optimalt og
+virksomheden står derfor overfor behovet for at forbedre kundeværdien og 
+dermed reducere churn-rate. 
+
 
 ### Afgrænsning
 
 \newpage
 
 ## Juridisk Metode
+
+JP/Politikens hus indsamler og behandler adfærdsdata og abonnementsoplysninger 
+fra deres digitale platforme med henblik på blandt andet at udvikle churn 
+prædiktionsmodeller, som kan understøtte den målrettede fastholdelse af 
+abonnenter. Behandlingen rejser juridiske spørgsmål under GDPR, 
+markedsføringsloven, AI forordningen og NIS2 direktivet. 
+Den lovgivningsmæssige ramme og de relevante retskilder er nærmere beskrevet i 
+Bilag – juridisk analyse afsnit 1.
+
+### Er JP's data personoplysninger?
+Datasættet indeholder pseudo_id, fødselsdato, køn og detaljerede adfærdsdata, 
+herunder sidevisninger, scrolldybde, devicetype og trafikkilde for over 1200 
+abonnenter. Selvom data er pseudonymiserede, udgør kombinationen heraf '
+personoplysninger i GDPR’s forstand, jf. art. 4, nr. 1, da re-identifikation er
+mulig. Hvad der er afgørende, er at JP selv besidder nøglen til sammenkoblingen 
+via pseudo_id. GDPR og databeskyttelsesloven finder derfor fuld anvendelse her.
+Nærmere analyse fremgår af Bilag, afsnit 2.
+
+### Grundlæggende principper
+JP’s behandling skal overholde de 7 principper i GDPR art. 5. De mest relevante
+for churn analysen er formålsbegrænsning, dataminimering og 
+opbevaringsbegrænsning, Data indsamlet til abonnementsadministration kan ikke 
+bare uden videre anvendes til churn profilering, medmindre dette er foreneligt
+med det oprindelige formål, jf. forenelighedstesten i art. 6, stk. 4. 
+Adfærdsprofilering til retention formål er ikke direkte foreneligt med
+abonnementsadministration. Tekniske metoder som fx PCA, klyngeanalyse samt 
+VIF-test kan identificere overflødige og korrelerede variable, og udgør dermed 
+okumentation for overholdelse af dataminimeringsprincippet som er en direkte 
+kobling mellem dataanalyse og juridisk compliance. JP’s delvise overholdelse af 
+art. 5. samt de væsentligste mangler analyseres i Bilag, afsnit 3.
+
 
 \newpage
 
@@ -544,14 +592,9 @@ tilbøjelige til at churne.
 
 Eksport af resultater til Power BI
 ```{r}
-write.table(cluster_profile, "data/klynge_profiler.csv",
-            sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
-
-write.table(model_data_clean, "data/model_data_med_klynger.csv",
-            sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
-
-write.table(mds_df, "data/mds_coordinates.csv",
-            sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+write_csv(cluster_profile, "data/klynge_profiler.csv")
+write_csv(model_data_clean, "data/model_data_med_klynger.csv")
+write_csv(mds_df, "data/mds_coordinates.csv")
 ```
 
 ```{r}
@@ -1903,30 +1946,11 @@ højeste AUC ogden bedste balance mellem sensitivitet og specificitet.
 
 Eksport af resultater til Power BI.
 ```{r}
-risk_list_m2 %>%
-  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
-  write.table("data/model2_risiko_liste.csv",
-              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
-
-risk_table_m2 %>%
-  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
-  write.table("data/model2_risiko_tabel.csv",
-              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
-
-economy_table_m2 %>%
-  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
-  write.table("data/model2_økonomisk_besparelse.csv",
-              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
-
-xgb_imp2 %>%
-  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
-  write.table("data/model2_xgb_variabel_vigtighed.csv",
-              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
-
-model_sammenligning2 %>%
-  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
-  write.table("data/model2_sammenligning.csv",
-              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
+write.csv(risk_list_m2, "data/model2_risiko_liste.csv", row.names = FALSE)
+write.csv(risk_table_m2, "data/model2_risiko_tabel.csv", row.names = FALSE)
+write.csv(economy_table_m2,"data/model2_økonomisk_besparelse.csv", row.names = FALSE)
+write.csv(xgb_imp2, "data/model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
+write.csv(model_sammenligning2,"data/model2_sammenligning.csv", row.names = FALSE)
 ```
 
 \newpage 
