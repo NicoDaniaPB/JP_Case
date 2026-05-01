@@ -544,9 +544,14 @@ tilbøjelige til at churne.
 
 Eksport af resultater til Power BI
 ```{r}
-write_csv(cluster_profile, "data/klynge_profiler.csv")
-write_csv(model_data_clean, "data/model_data_med_klynger.csv")
-write_csv(mds_df, "data/mds_coordinates.csv")
+write.table(cluster_profile, "data/klynge_profiler.csv",
+            sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+
+write.table(model_data_clean, "data/model_data_med_klynger.csv",
+            sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
+
+write.table(mds_df, "data/mds_coordinates.csv",
+            sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
 ```
 
 ```{r}
@@ -1898,11 +1903,30 @@ højeste AUC ogden bedste balance mellem sensitivitet og specificitet.
 
 Eksport af resultater til Power BI.
 ```{r}
-write.csv(risk_list_m2, "data/model2_risiko_liste.csv", row.names = FALSE)
-write.csv(risk_table_m2, "data/model2_risiko_tabel.csv", row.names = FALSE)
-write.csv(economy_table_m2,"data/model2_økonomisk_besparelse.csv", row.names = FALSE)
-write.csv(xgb_imp2, "data/model2_xgb_variabel_vigtighed.csv", row.names = FALSE)
-write.csv(model_sammenligning2,"data/model2_sammenligning.csv", row.names = FALSE)
+risk_list_m2 %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/model2_risiko_liste.csv",
+              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
+
+risk_table_m2 %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/model2_risiko_tabel.csv",
+              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
+
+economy_table_m2 %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/model2_økonomisk_besparelse.csv",
+              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
+
+xgb_imp2 %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/model2_xgb_variabel_vigtighed.csv",
+              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
+
+model_sammenligning2 %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+  write.table("data/model2_sammenligning.csv",
+              sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
 ```
 
 \newpage 
