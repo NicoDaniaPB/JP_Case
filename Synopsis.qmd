@@ -363,13 +363,13 @@ model_data <- readRDS("data/renset_datasæt.rds")
 behavior_agg <- readRDS("data/datasæt_konstruerede_variabler.rds")
 ```
 
-Join af adfærdsvariabler.
+Join af adfærdsvariabler med modeldata. 
 ```{r}
 model_data <- model_data %>%
   left_join(behavior_agg, by = "pseudo_id")
 ```
 
-ndledende udvælgelse af klyngevariabler.
+Udvælgelse af variabler der skal bruges til klyngeanalyse-algoritmen. 
 ```{r}
 cluster_vars_raw <- model_data %>% 
   select(any_of(c(
@@ -405,10 +405,17 @@ cluster_vars <- cluster_vars_raw %>%
 
 ### Klyngeanalyse
 
-Beregning af Gower distance.
+Beregning af Gower-distance.
 ```{r}
 gower_dist <- daisy(cluster_vars %>% select(-pseudo_id), metric = "gower")
 ```
+Der anvendes Gower-distance, da datasættet indeholder både numeriske og 
+kategoriske variabler. Gower-distance gør det muligt, at kombinere mixed-data i
+en samlet afstandsmåling. Dette er grunden til der ikke er kørt en 
+Prinicpal Component Analysis (PCA), da den kræver numeriske, kontinuerte 
+variabler. PCA bruger i praksis Euklidisk-distance, fordi den bygger 
+på kovariansmatricen, som forudsætter lineære sammenhænge, og dermed ikke er i 
+stand til at håndtere kategoriske variabler. 
 
 Hierarkisk clustering og dendrogram.
 ```{r}
@@ -416,6 +423,11 @@ hc <- hclust(gower_dist, method = "ward.D2")
 plot(hc, main = "Hierarkisk clustering – kundetyper")
 rect.hclust(hc, k = 4, border = "red")
 ```
+Der køres en hierarkisk agglomerativ klyngeanalyse, hvor der først beregnes en
+Gower-distance mellem alle observationer. Derefter anvendes hclust() med 
+Ward.D2‑metoden til at opbygge et dendrogram, som viser, hvordan observationerne
+gradvist grupperes. Til sidst markeres fire klynger i plottet med rect.hclust(),
+som skærer dendrogrammet på det niveau, der svarer til fire klynger.
 
 Tilføjelse af klyngelabels. 
 ```{r}
@@ -448,6 +460,42 @@ cluster_profile <- model_data_clean %>%
     .groups = "drop"
   )
 ```
+Forklaring af klyngerne:
+Klynge 1 – “De tunge, men ustabile brugere”
+- Høj aktivitet: mange sidevisninger, mange unikke sider og høj brug af 
+restricted-indhold.
+- Primært desktop-brugere.
+- Moderat alder (omkring 60 år).
+- Lav retention efter kampagne og relativt høj churn.
+- Læser især indland og forside.
+
+Klynge 2 – “De lavengageret der hurtigt falder fra”
+- Lav aktivitet: få besøg, få sider og lav scroll.
+- Meget høj mobilandel (70 % eller mere).
+- Lav retention og høj churn.
+- Læser primært forside og indland.
+- Kort abonnementsperiode.
+
+Klynge 3 – “De engagerede, modne kvalitetslæsere med god fastholdelse"
+- Høj aktivitet: mange besøg, mange artikler og høj scroll.
+- Blandet device-brug (både mobil og desktop).
+- Høj retention (ca. 68 %) og lav churn.
+- Læser bredt: indland, forside, sport, social m.m.
+- Moden alder (ca. 58–59 år).
+
+Klynge 4 – “De ekstremt loyale langtidssubscribers”
+- Meget lang abonnementsperiode (over 1.100 dage i gennemsnit).
+- 100 % retention efter kampagne.
+- Ingen churn.
+- Høj aktivitet og bred læseadfærd.
+- Blandet device-brug.
+
+Klynge 2 har den højeste churn-risiko, mens klynge 4 har den laveste.
+Der er en tydelig sammenhæng mellem aktivitet og churn. Det kan ses, at høj 
+aktivitet = lav churn, og lav aktivitet = høj churn. Brugere, der læser dybere 
+og mere redaktionelt indhold (dx artikler, indland, sport, analyser), har 
+markant lavere churn end dem, der primært læser mere "overfladiske"
+kategorier som økonomi og udland.
 
 Outcome profilering per klynge.
 ```{r}
@@ -461,6 +509,10 @@ cluster_outcomes <- model_data_clean %>%
     .groups = "drop"
   )
 ```
+Klynge 2 har den laveste fast churn‑rat, hvilket gør den til den mindst 
+risikable klynge ift hurtig churn.  Klynge 4 og klynge 3 er også ret stabile, 
+men ikke helt på niveau med klynge 2. Klynge 1 er den mest churn‑risikable med 
+den højeste fast churn‑rate.
 
 ### Visualisering
 
@@ -480,7 +532,15 @@ ggplot(mds_df, aes(Dim1, Dim2, color = cluster)) +
        x = "Dimension 1", y = "Dimension 2")
 ```
 
-### em som CSV-filer til Power BI
+MDS‑visualiseringen gør det tydeligt, at klynge 1 ligger længst fra de andre
+klynger. Det er også den klynge, der har den højeste fast‑churn‑rate og dermed 
+den kundegruppe der har den største churn‑risiko. De øvrige klynger ligger 
+tættere på hinanden. Visualiseringen bekræfter derfor, at klynge 1 kræver 
+særligt fokus i retention‑indsatser, hvis JP skal øge deres omsætning. Dette er
+fordi de både er mest forskellige fra de loyale segmenter og samtidig de mest 
+tilbøjelige til at churne.
+
+### Gem som CSV-filer til Power BI
 
 Eksport af resultater til Power BI
 ```{r}
@@ -551,7 +611,7 @@ write_csv(mds_df, "data/mds_coordinates.csv")
 
 \newpage
 
-## Modellering - Chrun i kampagnen 
+## Modellering - Churn i kampagnen 
 
 ### Dataklargøring til modellering
 
@@ -602,6 +662,12 @@ model_data <- model_data %>%
   drop_na()
 ```
 
+Der er lavet feature engineering for at forbedre modellens evne til at lære 
+mønstre, der ellers ville være skjulte i de oprindelige data. De nye variabler, 
+der er skabt her, giver modellen mere meningsfuld information og gør den bedre 
+til at forudsige, om en kunde fortsætter churner under kampagnen. 
+
+
 Fjernelse af leakage-variabler samt overflødige variabler. 
 ```{r}
 model_data <- model_data %>%
@@ -627,8 +693,17 @@ model_data <- model_data %>%
     -age
   )
 ```
+Leakage‑variablerne er nu fjernet. Det er vigtigt, fordi de indeholder 
+information, som kun er kendt efter kampagneperioden er slut. 
+Hvis leakage variabler bliver i datasættet,  så lærer modellen at forudsige 
+churn ud fra fremtidsinformation, som den ikke vil have adgang til, 
+når den skal lave en reel forudsigelse. Dette betyder, at modellen
+bliver urealistisk god under træning, men ubrugelig i praksis.
 
-pseudo_id gemmes i en separat vektor inden variablen fjernes fra datasættet, da den ikke må indgå som prædiktor i modellerne, men skal bruges senere til at knytte churn sandsynligheder tilbage til de specifikke kunder. 
+
+pseudo_id gemmes i en separat vektor inden variablen fjernes fra datasættet, 
+da den ikke må indgå som prædiktor i modellerne, men skal bruges senere til at 
+knytte churn sandsynligheder tilbage til de specifikke kunder.
 ```{r}
 pseudo_ids <- model_data$pseudo_id
 model_data <- model_data %>% select(-pseudo_id)
@@ -653,7 +728,7 @@ test_ids <- pseudo_ids[-train_index]
 
 ### Håndtering korrelerede variabler
 
-Kontrollerer for høt korrelerede variabler.
+Kontrollerer for højt-korrelerede variabler.
 ```{r}
 cor_matrix <- cor(train_data %>% select(where(is.numeric)))
 high_cor <- which(abs(cor_matrix) > 0.95 & cor_matrix != 1, arr.ind = TRUE)
@@ -687,6 +762,16 @@ Verifikation af lineær uafhængigheder.
 findLinearCombos(train_data_log_reg %>% select(where(is.numeric)))
 ```
 
+De lineære afhængige variabler er nu fjernet. Lineære afhængigheder er et 
+problem for den logistiske regressionsmodel, fordi modellen ikke kan skelne 
+mellem variabler, der i praksis indeholder den samme information. Det er dog 
+ikke et problem for de træbaseret metoder der anvendes 
+(Random Forest og XGBoost), fordi træbaseret-modeller kun vælger en variabel 
+ad gangen. Når et beslutningstræ splitter data, vælger det den variabel,
+der giver den bedste forbedring i fx Gini eller entropi.
+Hvis to variabler indeholder den samme information,  så vælger træet bare et af 
+dem, og ignorerer den anden.
+
 ```{r}
 set.seed(47)
 ```
@@ -700,8 +785,16 @@ cv_ctrl <- trainControl(
   summaryFunction = twoClassSummary
 )
 ```
+Der er nu opsat en cross-validation kontrol til modelevaluering. Dette skal 
+afgør hvor gode modellerne er til at præstere på nye ukendte data. Hvis modellen
+klarer sig godt på træningsdataene, men ikke testdataene, så betyder det, at 
+modellen overfitter, dvs. opsamler alt muligt unødvendig "støj" information. 
 
 ### Logistisk Regression
+
+Der laves en Logistisk Regression model, da den skal bruges som en 
+"baseline-model", som anvendes til at sammenligne alle de andre modeller med. 
+Dette giver en direkte indsigt i den sammenhæng der er i dataene.
 
 Træning af logistisk regression med cross-validation. 
 ```{r}
@@ -738,7 +831,7 @@ Beregning af ROC-kurve.
 roc_log <- roc(test_data_log_reg$continued_after_campaign, log_prob)
 ```
 
-Bestemmelse af optimalt threshold. 
+Bestemmelse af optimalt threshold via Youden's J.
 ```{r}
 cut_log <- as.numeric(coords(roc_log, "best", ret = "threshold"))
 ```
@@ -757,6 +850,12 @@ cm_log <- confusionMatrix(log_pred, test_data$continued_after_campaign)
 \newpage
 
 ### Random Forest
+
+Random Forest anvendes for at fange mere komplekse mønstre, da den har en
+højere varians end en logistisk regression. Random Forest kan også håndtere 
+ikke-lineære relationer, og er robust over for støj og outliers. Dette gør at 
+modellens performance forbedres i forhold til den logistiske regressionsmodel, 
+samt at der kan afdækkes interaktioner mellem variablerne. 
 
 ```{r}
 set.seed(47)
@@ -796,7 +895,7 @@ Beregning af ROC-kurve.
 roc_rf <- roc(test_data$continued_after_campaign, rf_prob)
 ```
 
-Bestemmelse af optimalt threshold. 
+Bestemmelse af optimalt threshold via Youden's J.
 ```{r}
 cut_rf <- as.numeric(coords(roc_rf, "best", ret = "threshold"))
 ```
@@ -815,6 +914,26 @@ cm_rf <- confusionMatrix(rf_pred, test_data$continued_after_campaign)
 \newpage
 
 ### XGBoost
+
+XGBoost har en meget høj præcision, og er meget effektiv til at håndtere
+komplekse datastrukturer. Udover det, så har XGBoost også indbygget 
+regularisering, som reducerer den støj, som modellen opsamler og dermed 
+reducerer overfitting. Boosting fungerer ved at bygge modeller sekventielt, 
+hvor hver nye model retter fejlene fra de forrige model. XGBoost har en 
+indbygget L1 og L2-regularisering, som reducerer overfitting, hvilket en 
+klassisk Gradient Boosting model ikke har, derfor er XGBoost et bedre valg 
+end en klassisk Gradient Boosting model. Der er også andre boosting modeller,
+som f.eks. AdaBoost, hvilket er en model som fokuserer meget på 
+fejlklassificerede observationer, hvilket gør den mere følsom over for 
+støj og outliers frem for en XGBoost-model, hvilket er årsagen til, at denne 
+model fravælges. Til sidst er der også LightGBM-modellen, som er hurtigere og
+mere memory-effektiv end XGBoost-modellen, men også mere følsom over for støj 
+og overfitting, derfor vil en XGBoost-model være et sikrere valg i et 
+forretningscase som denne.
+Grunden til, at der fravælges modeller som KNN, Naive Bayes og SVM, er
+primært baseret på deres begrænsninger i forhold til datasættet og formålet 
+med churn-prediktionen. 
+
 
 Konvertering til numerisk matrix.
 ```{r}
@@ -897,7 +1016,7 @@ Beregning af ROC-kurve.
 roc_xgb <- roc(test_data$continued_after_campaign, xgb_prob)
 ```
 
-Bestemmelse af optimalt threshold. 
+Bestemmelse af optimalt threshold via Youden's J.
 ```{r}
 cut_xgb <- as.numeric(coords(roc_xgb, "best", ret = "threshold"))
 ```
@@ -957,7 +1076,7 @@ Definition af listepris.
 JP_pris <- 199  
 ```
 
-Filtrering af højrisikokunder.
+Filtrering af højrisiko-kunder.
 ```{r}
 high_risk <- risk_list_sorted %>% 
   filter(churn_probability > 0.75)
@@ -1146,6 +1265,18 @@ cv_sammenligning <- bind_rows(
   select(Model, ROC, Sens, Spec)
 ```
 
+
+Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
+fortsætter efter kampagneperioden (churn eller ej). Vi har brugt korrekt 
+feature engineering og fjernet dataleakage, og lavet tre forskellige 
+klassifikationsmodeller. XGBoost modellen opnår den højeste AUC på 78,5% 
+og dermed den bedste balance mellem sensitivitet og specificitet, hvor den 
+finder 75,0% af churnerne og 70,8% af de kunder der fortsætter. Random 
+Forest har en AUC på 77,1% og finder 94,2% af churnerne, men kun 44,3% af 
+ikke-churnerne — en ubalance der gør den mindre egnet. Logistisk regression 
+er den svageste model med AUC på 66,9%. Vi har valgt XGBoost da den har den 
+bedste balance mellem sensitivitet og specificitet.
+
 ### Gem som CSV-filer til Power BI
 
 ```{r}
@@ -1173,7 +1304,7 @@ model_data_raw %>%
               sep = ";", dec = ",", row.names = FALSE, quote = FALSE)
 ```
 
-## Modellering - Chrun kort tid efter kampagnen
+## Modellering - Churn kort tid efter kampagnen
 
 ### Dataklargøring til modellering
 
@@ -1238,7 +1369,7 @@ model2_data <- model2_data %>%
     newsletters_before_order,
     newsletters_after_order,
     
-    # Adfærd de første 30 dage (ingen leakage – kampagnen er 2 måneder)
+    # Adfærd de første 30 dage
     visits,
     unique_pages,
     restricted_views,
@@ -1280,6 +1411,8 @@ Identifikation af lineært afhængige variabler.
 findLinearCombos(train_data2 %>% select(where(is.numeric)))
 ```
 
+Der er ikke identificeret lineære afhængige variabler.
+
 ### Opsætning af cross-validation kontrol til modelevaluering.
 
 ```{r}
@@ -1297,6 +1430,10 @@ cv_ctrl2 <- trainControl(
 ```
 
 ### Logistisk Regression
+
+Årsagen der er valgt en lineær regression model til at forudsige churn kort tid 
+efter kampagnen, er den samme årsag som ved model 1: Logistisk regression 
+fungerer som en "baseline"-model. 
 
 Træning af logistisk regression med cross-validation.
 ```{r}
@@ -1325,7 +1462,7 @@ Beregning af ROC-kurve.
 roc_log2 <- roc(test_data2$churn_10, log_prob2)
 ```
 
-Bestemmelse af optimalt threshold. 
+Bestemmelse af optimalt threshold via Youden's J.
 ```{r}
 cut_log2 <- as.numeric(coords(roc_log2, "best", ret = "threshold"))
 ```
@@ -1340,6 +1477,10 @@ cm_log2 <- confusionMatrix(log_pred2, test_data2$churn_10)
 
 
 ### Random Forest
+
+Årsagen der er valgt en Random Forest model til at forudsige churn kort tid 
+efter kampagnen, er den samme årsag som ved model 1.
+
 
 ```{r}
 set.seed(47)
@@ -1378,7 +1519,7 @@ Beregning af ROC-kurve.
 roc_rf2 <- roc(test_data2$churn_10, rf_prob2)
 ```
 
-Bestemmelse af optimalt threshold.
+Bestemmelse af optimalt threshold via Youden's J.
 ```{r}
 cut_rf2 <- as.numeric(coords(roc_rf2, "best", ret = "threshold"))
 ```
@@ -1395,6 +1536,9 @@ cm_rf2 <- confusionMatrix(rf_pred2, test_data2$churn_10)
 ```
 
 ### XGBoost
+
+Årsagen der er valgt en XGBoost model til at forudsige churn kort tid 
+efter kampagnen, er den samme årsag som ved model 1.
 
 Konvertering til numerisk matrix.
 ```{r}
@@ -1488,7 +1632,7 @@ Beregning af ROC-kurve.
 roc_xgb2 <- roc(test_data2$churn_10, xgb_prob2)
 ```
 
-Bestemmelse af optimalt threshold. 
+Bestemmelse af optimalt threshold via Youden's J.
 ```{r}
 cut_xgb2 <- as.numeric(coords(roc_xgb2, "best", ret = "threshold"))
 ```
@@ -1735,6 +1879,20 @@ cv_sammenligning2 <- bind_rows(
   xgb_cv2_results) %>%
   select(Model, ROC, Sens, Spec)
 ```
+
+Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
+fortsætter efter kampagneperioden (churn eller ej). Vi har brugt korrekt 
+feature engineering og fjernet dataleakage, og lavet tre forskellige 
+klassifikationsmodeller. XGBoost modellen opnår den højeste AUC på 82,8% 
+og dermed den bedste balance mellem sensitivitet og specificitet, hvor den 
+finder 86% af churnerne og 66,7% af de kunder der fortsætter. Random 
+Forest har en AUC på 80,2% og finder 69,8% af churnerne, og 81% af 
+ikke-churnerne.  Logistisk regression 
+er den svageste model med AUC på 70.9%. Vi har valgt XGBoost da den har den
+højeste AUC ogden bedste balance mellem sensitivitet og specificitet.
+
+
+
 
 ### em som CSV-filer til Power BI
 
