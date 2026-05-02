@@ -384,7 +384,7 @@ Metoden fungerer ved, at:
 - Resultatet kan visualiseres i et dendrogram, hvor man efterfølgende vælger et 
 passende antal klynger.
 
-#### Anvengelse af Gower-distance
+#### Anvendelse af Gower-distance
 Til at måle lighed mellem kunder anvendes der Gower distance, da datasættet 
 indeholder både numeriske og kategoriske variabler. Gower distance gør det 
 muligt at kombinere disse datatyper i én samlet afstandsmåling.
@@ -2321,6 +2321,12 @@ model_sammenligning2 %>%
   write.table("data/model2_sammenligning.csv",
               sep = ";", dec = ".", row.names = FALSE, quote = FALSE)
 ```
+
+
+\newpage
+
+## Modellering - Multi Layer Perceptron (MLP) model
+
 
 \newpage 
 
