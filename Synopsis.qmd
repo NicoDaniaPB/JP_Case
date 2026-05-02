@@ -76,11 +76,12 @@ pacman::p_load(
 \pagenumbering{arabic} 
 \setcounter{page}{1}
 
-## Executive summary
 
 \newpage
 
-## Problemstilling {#sec-problemstilling}
+## Forretningsproblem for JP
+
+### Problemstilling {#sec-problemstilling}
 En høj churn-rate påvirker JP’s økonomiske stabilitet og dens vækstmuligheder.
 En høj churn-værdi øger JP’s behov for konstant at tiltrække nye kunder, da den
 tilbagevendende indtægt reduceres. Samtidigt indikerer en høj churn-rate, at
@@ -106,6 +107,8 @@ dermed reducere churn-rate.
 \newpage
 
 ## Juridisk Metode
+
+### JP og datajura 
 
 JP/Politikens hus indsamler og behandler adfærdsdata og abonnementsoplysninger 
 fra deres digitale platforme med henblik på blandt andet at udvikle churn 
@@ -242,7 +245,9 @@ abonnenter indgår.
 
 \newpage
 
-## Metode og videnskabsteori
+## Videnskabsteori og metode
+
+### Videnskabsteori
 Projektet tager udgangspunkt i et kritisk realistisk paradigme, da kunde churns 
 kan påvirkes af flere underliggende mekanismer og betragtes som et observerbart
 fænomen. Kritisk realisme tager i denne sammenhæng udgangspunkt i, at de 
@@ -272,13 +277,198 @@ kvantitative variabler såsom brugerfrekvens, engagementsniveau og
 abonnementsoplysninger, og er suppleret med kvalitative indsigter fra JP, der 
 kan bidrage til en mere nuanceret forståelse.
 
-
-Til modellering anvendes klassifikationsalgoritmer, der estimerer sandsynligheden for churn. Validiteten sikres gennem test på data, mens reliabiliteten understøttes af en konsistent og reproducerbar analyseproces. Resultaternes kvalitet afhænger i høj grad af datagrundlaget og de valgte features, hvilket understreger betydningen af en god  datarensning. 
-
+### Metode 
+Til modellering anvendes klassifikationsmodeller, der estimerer 
+sandsynligheden for churn. Validiteten sikres gennem test på data, mens 
+reliabiliteten understøttes af en konsistent og reproducerbar analyseproces. 
+Resultaternes kvalitet afhænger i høj grad af datagrundlaget og de valgte 
+features, hvilket understreger betydningen af en god  datarensning. 
 
 
 \newpage
 
+## Machine Learning i praksis for JP - Churn prediction 
+
+### Valg af klassifikationsmodeller
+I projektet anvendes der klassifikationsmodeller, som forudsiger den procentvise
+sandsynlighed for churn ved en kunde. Her trænes modellen på kundedata og 
+adfærdsvariabler, og outputtet er sandsynligheden for churns. Det gør det muligt
+at identificere de kunder, der har høj risiko for at opsige deres abonnement, og
+dermed målrette retention-indsatser mere effektivt. Til træningen anvendes der 
+både logistisk regression, Random Forest og XGBoost, og modellerne evalueres på 
+en hold-out testdata med metrics som AUC, accuracy, sensitivity og specificity 
+for at sikre robust performance. Her anvendes modellerne også i en bevidst 
+rækkefølge, hvor man gradvist øger kompleksiteten og performance, samtidig med 
+at man opbevarer forståelsen af dataene. De vigtigste features identificeres 
+også, så JP kan forstå, hvilke faktorer der påvirker churn mest. Denne tilgang 
+giver en kombination af præcision og forståelse, som understøtter JP’s 
+beslutninger omkring fastholdelse af deres kunder. 
+
+### Logistisk Regression
+Begrundelsen for valget om logistisk regression model er fordi det er den, der 
+er lettest at fortolke på. Den fungerer derfor som en "baseline-model", som 
+anvendes til at sammenligne alle de andre modeller med. Dette giver en direkte 
+indsigt i den sammenhæng der er i dataene, hvilket kan ses ved koefficienterne, 
+og dermed kan der identificeres de mest signifikante faktorer for churn. 
+
+### Random Forest 
+Der laves en Random Forest model, som anvendes for at fange mere komplekse 
+mønstre, da den har en højere varians end en logistisk regression. Random Forest
+kan også håndtere ikke-lineære relationer, og er robust over for støj og 
+outliers. Dette gør at modellens performance forbedres i forhold til den 
+logistiske regressionsmodel, samt at der kan afdækkes interaktioner mellem 
+variablerne. 
+
+### XGBoosting
+En XGBoost-model har en meget høj præcision, og er meget effektiv til at 
+håndtere komplekse datastrukturer. Udover det, så har XGBoost også indbygget 
+regularisering, som reducerer den støj, som modellen opsamler og dermed 
+reducerer overfitting. Boosting fungerer ved at bygge modeller sekventielt, 
+hvor hver nye model retter fejlene fra de forrige model. 
+
+#### Hvorfor XGBoost og ikke andre boosting-modeller? 
+XGBoost har en indbygget L1 og L2-regularisering, som reducerer overfitting, 
+hvilket en klassisk Gradient Boosting model ikke har, derfor er XGBoost et bedre
+valg end en klassisk Gradient Boosting model. Der er også andre boosting 
+modeller, som f.eks. AdaBoost, hvilket er en model som fokuserer meget på 
+fejlklassificerede observationer, hvilket gør den mere følsom over for støj og 
+outliers frem for en XGBoost-model, hvilket er årsagen til, at denne model 
+fravælges. Til sidst er der også LightGBM-modellen, som er hurtigere og mere 
+memory-effektiv end XGBoost-modellen, men også mere følsom over for støj og 
+overfitting, derfor vil en XGBoost-model være et sikrere valg i et 
+forretningscase som denne.
+
+### Begrundelse for fravalg af andre modeller
+Grunden til, at der fravælges modeller som KNN, Naive Bayes og SVM, er primært 
+baseret på deres begrænsninger i forhold til datasættet og formålet med 
+churn-prediktionen. Der gennemgåes nu begrundelsen for fravalget af hver enkelt
+model. 
+
+#### K-Nearest Neighbor (KNN)
+KNN kan være udfordrende med større datasæt, da det er 
+beregningsmæssigt tungt og følsomt over for skala og irrelevant variabel. 
+
+#### Naive Bayes (NB)
+NB antager uafhængighed mellem features, hvilket sjældent holder i praksis for 
+komplekse kundedata med afhængige adfærdsvariable, hvilket kan føre til dårlig 
+præcision. 
+
+#### Support Vector Machine (SVM)
+SVM kan give gode resultater, men kræver ofte omfattende tuning af kerner og 
+hyperparametre, og det er mindre intuitivt at fortolke feature-vigtighed, 
+hvilket gør det mindre egnet til at understøtte beslutninger om 
+retention-strategier.
+
+\newpage
+
+## Machine Learning i praksis for JP - Segmentering af kunder
+
+### Unsupervised learning - Klyngeanalyse
+Når man segmenterer JP's kundetyper, så anvender man en unsupervised learning 
+metode, da man ikke har en afhængig variabel (y). I modsætning til 
+klassifikationsmodeller forsøger man her at finde strukturer og mønstre i data 
+uden foruddefinerede labels.Klyngeanalyse benyttes, som en 
+machine learning-metode, der automatisk opdeler observationer i grupper 
+(klynger) baseret på deres lighed. Formålet er at identificere homogene 
+kundesegmenter. Man anvender specifikt hierarkisk agglomerativ (bottom-up) 
+clustering. 
+
+Metoden fungerer ved, at:
+
+- Hver observation starter som sin egen klynge
+
+- De mest lignende klynger samles iterativt
+
+- Processen fortsætter, indtil alle observationer er samlet i en klynge
+
+- Resultatet kan visualiseres i et dendrogram, hvor man efterfølgende vælger et 
+passende antal klynger.
+
+#### Anvengelse af Gower-distance
+Til at måle lighed mellem kunder anvendes der Gower distance, da datasættet 
+indeholder både numeriske og kategoriske variabler. Gower distance gør det 
+muligt at kombinere disse datatyper i én samlet afstandsmåling.
+
+#### Begrundelse for fravalg af en Principal Component Analysis (PCA)
+Typisk anvendes Principal Component Analysis (PCA) før clustering for at 
+reducere dimensioner og støj i data. I dette tilfælde er der dog fravalgt PCA, 
+da metoden kun fungerer på numeriske variable og dermed ikke kan håndtere vores
+mixed-type datastruktur uden transformation. Derfor vurderes det, at det er mere
+hensigtsmæssigt at anvende Gower-distance direkte.
+
+\newpage
+
+## Implementering af neurale netværk og deep-learning for JP 
+
+### Opbygning af et neural netværk
+Det neurale netværk er i stand til at modellere meget komplekse ikke-lineære
+sammenhæng. Der er tale om fleksible modeller, der kan løse komplekse mønstre 
+ved at sekventielt kombinere mange simple funktioner. 
+Et neural netværk består  af mange små enheder som kaldes “neuroner”. Disse 
+neuroner er forbundet i tre lag: Inputlag, skjulte lag og output lag. 
+Neurale netværk bruger også aktiverings funktioner, som gør netværket i stand 
+til at lære komplekse mønstre (dvs. ikke lineære sammenhæng). Uden en 
+aktiveringsfunktion, er en neural netværks model bare det samme som en lineær 
+model. Eksempler på aktiveringsfunktioner kunne f.eks. være: Sigmoid, ReLU eller
+Tanh. Ved træningen af neurale netværk lærer det at justerer vægtene, så 
+outputtet bliver korrekt. Først laves der forward pass, dvs. data sendes 
+igennem netværket, hvilket giver et output. Derefter laves der fejlberegning,
+hvor man måler forskellen mellem output og det rigtige svar med en loss 
+function. Til sidst laves der backpropagation, som gør at fejlen sendes baglæns
+gennem netværket for at justere vægtene på forbindelserne mellem nodes. 
+Dette bygger på et gradient descent, hvor man finder den bedste løsning ved 
+sekventielt at minimere fejl ved hver nye model. 
+
+### Fordele og ulemper ved en Neural Netværk (NN) model
+Fordelen ved en neural netværks model frem for andre mere simple 
+klassifikationsmodeller er, at man kan fange meget komplekse mønstre.
+Ulemperne er, at en neural netværksmodel kræver meget data og er meget 
+beregningstung. Dette er også hovedårsagerne til, at der ikke laves et produkt 
+til JP, som er baseret på en NN-model. I stedet kodes der en 
+klassifkations model i R, og laves herefter en applikation af modellen i 
+Power BI. 
+
+### Hvad der kræves af JP, for at implentere en Neural Netværk (NN) model
+Skal man have en effektiv neural NN-model for JP, så kræver det et større 
+datasæt som er bygget op over en længere periode, samt skal man have mere tid 
+til at gøre denne model mere praktisk anvendelig. Der vælges i opgaven at kode 
+en neural netværks model, som fungerer som en  slags “skitse”, så man får vist 
+hvilken retning JP potentielt kunne gå hen i mod, såfremt der er mere tid og et 
+større datasæt. Der ses i opgaven, at accuracy i NN-modellen er under 50%, dvs
+tilfældig gætning er bedre end denne model. Dette var også forventet, pga de
+begrænsninger der er beskrevet.
+
+### Hvilken Neural Netværk (NN) model der anvendes i opgaven
+Den neurale netværksmodel der anvendes i opgaven er en 
+Multi-Layer Perceptron (MLP). Her er alle ledende fuldt forbundet, dvs. alle 
+neuroner er koblet til alle i næste lag. Først smides dataene ind som input, 
+hvorefter de føres videre til de skjulte lag og derefter kommer ud som output. 
+Der er ingen særlig struktur i en MLP-NV-model, da alle input behandles ens. 
+
+\newpage
+
+## Klyngeanalyse til PowerBI visualisering. 
+
+Det kan vurderes, at en implementering af nye modeller med Power BI til 
+visualisering, som JP kan anvende, er en realistisk løsning på baggrund af 
+JP’s nuværende niveau af data modenhed. JP befinder sig med deres
+nuværende forretningsstruktur i fase 4 i forhold til Gartner’s 
+Data Governance Maturity Model. JP anvender i høj grad data som et brugbart 
+værktøj til at træffe datadrevne beslutninger i deres virksomhed, og de har 
+allerede medarbejdere, som primært arbejder med data. Den nye model bør derfor 
+implementeres i virksomheden og integreres med Power BI for at understøtte en 
+mere målrettet og datadrevet markedsføringsindsats. Modellen kan i  praksis 
+hjælpe JP med at identificere de abonnenter, der har størst risiko for at 
+opsige deres abonnement, og dermed målrette deres kampagner og kommunikation 
+mere effektivt mod de rette segmenter. Dette giver en god mulighed for bedre 
+ressourceallokering og øger sandsynligheden for at fastholde deres abonnementer.
+Samtidig er det vigtigt, at f.eks. deres Head of Analytics aktivt kan anvende  
+Power BI som beslutningsværktøj til at træffe velinformerede og databaserede 
+forretningsbeslutninger. For JP er det centralt at fastholde en høj standard for
+datakvalitet og samtidig sikre, at rapporteringen er både overskuelig og løbende
+opdateret, så den er optimal og understøtter en effektiv abonnementsforretning. 
+
+\newpage
 
 ## Dataklargørelse
 
@@ -1073,9 +1263,7 @@ cm_log <- confusionMatrix(log_pred, test_data$continued_after_campaign)
 
 ### Random Forest
 
-Random Forest anvendes for at fange mere komplekse mønstre, da den har en
-højere varians end en logistisk regression. Random Forest kan også håndtere 
-ikke-lineære relationer, og er robust over for støj og outliers. Dette gør at 
+Random Forest anvendes for at fange mere komplekse mønstre. Dette gør at 
 modellens performance forbedres i forhold til den logistiske regressionsmodel, 
 samt at der kan afdækkes interaktioner mellem variablerne. 
 
@@ -1138,23 +1326,11 @@ cm_rf <- confusionMatrix(rf_pred, test_data$continued_after_campaign)
 ### XGBoost
 
 XGBoost har en meget høj præcision, og er meget effektiv til at håndtere
-komplekse datastrukturer. Udover det, så har XGBoost også indbygget 
-regularisering, som reducerer den støj, som modellen opsamler og dermed 
-reducerer overfitting. Boosting fungerer ved at bygge modeller sekventielt, 
-hvor hver nye model retter fejlene fra de forrige model. XGBoost har en 
-indbygget L1 og L2-regularisering, som reducerer overfitting, hvilket en 
-klassisk Gradient Boosting model ikke har, derfor er XGBoost et bedre valg 
-end en klassisk Gradient Boosting model. Der er også andre boosting modeller,
-som f.eks. AdaBoost, hvilket er en model som fokuserer meget på 
-fejlklassificerede observationer, hvilket gør den mere følsom over for 
-støj og outliers frem for en XGBoost-model, hvilket er årsagen til, at denne 
-model fravælges. Til sidst er der også LightGBM-modellen, som er hurtigere og
-mere memory-effektiv end XGBoost-modellen, men også mere følsom over for støj 
-og overfitting, derfor vil en XGBoost-model være et sikrere valg i et 
-forretningscase som denne.
-Grunden til, at der fravælges modeller som KNN, Naive Bayes og SVM, er
-primært baseret på deres begrænsninger i forhold til datasættet og formålet 
-med churn-prediktionen. 
+komplekse datastrukturer.  Boosting fungerer ved at bygge modeller sekventielt, 
+hvor hver nye model retter fejlene fra de forrige model. Derfor er en 
+boosting-model godt egnet til en case med churn-prædiktion, og der er en 
+hypoteseom, at den vil klare sig bedst af de tre valgte
+klassifikationsmodeller. 
 
 
 Konvertering til numerisk matrix.
@@ -1293,7 +1469,7 @@ risk_table <- risk_list_sorted %>%
 
 ### Økonomisk analyse af churn-kampagne
 
-Definition af listepris.
+Definition af listepris (der vælges standardprisen fra JP's hjemmeside).
 ```{r}
 JP_pris <- 199  
 ```
@@ -1654,8 +1830,7 @@ cv_ctrl2 <- trainControl(
 ### Logistisk Regression
 
 Årsagen der er valgt en lineær regression model til at forudsige churn kort tid 
-efter kampagnen, er den samme årsag som ved model 1: Logistisk regression 
-fungerer som en "baseline"-model. 
+efter kampagnen, er den samme årsag som ved model 1.
 
 Træning af logistisk regression med cross-validation.
 ```{r}
@@ -2112,7 +2287,7 @@ finder 86% af churnerne og 66,7% af de kunder der fortsætter. Random
 Forest har en AUC på 80,2% og finder 69,8% af churnerne, og 81% af 
 ikke-churnerne.  Logistisk regression 
 er den svageste model med AUC på 70.9%. Vi har valgt XGBoost da den har den
-højeste AUC ogden bedste balance mellem sensitivitet og specificitet.
+højeste AUC og den bedste balance mellem sensitivitet og specificitet.
 
 
 
