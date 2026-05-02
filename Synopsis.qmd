@@ -104,6 +104,7 @@ dermed reducere churn-rate.
 
 ### Afgrænsning
 
+
 \newpage
 
 ## Juridisk Metode
@@ -2348,71 +2349,193 @@ Eksempler på afsnit i bilag:
 
 ## Dataforståelse (CRISP-DM)
 
-### Forretningsforståelse
-Afklare formål, behov og succeskriterier (hvorfor laver vi analysen?).
+[Faserne i CRISP-DM.](crisp-dm.png){#fig-crispdm width="40%"}
 
-### Dataforståelse
-Indsamle data, få overblik, undersøge datakvalitet og finde mønstre.
+### 1) Forretningsforståelse 
+Projektet tager udgangspunkt i JP’s forretningsproblem, som omhandler deres 
+udfordringer i forbindelse med deres kampagne, hvor der skulle undersøges, 
+hvordan man ved hjælp af en churn-model kan optimere kampagnen, og beholde 
+flere mulige abonnementer og prioritere de vigtige kunder. 
 
-### Dataklargøring
-Rense, strukturere og omforme data, så det er klar til analyse/modellering.
+### 2) Dataforståelse
+I forhold til JP projektet er der indsamlet historiske brugerdata med formålet
+om at få et overblik og opnå en god forståelse af datakvaliteten hos JP. 
+I projektet forsøges der at identificeres, hvilke variabler som der kan have 
+den største betydning i forhold til, at kunderne opsiger deres abonnement. 
+Der bliver derfor i projektet undersøgt frekvens af besøg, prisændringer, 
+abonnementsperiode, læseaktivitet,  og data om selve kampagnen. For at der 
+potentielt kan findes de største årsager til, at kunderne churner, er der altså 
+generelt blevet undersøgt adfærdsmæssige og eksterne faktorer. 
 
-### Modellering
-Udvikle og træne modeller samt justere parametre.
+### 3) Dataklargøring
+I projektet er der anvendt det tredje trin i CRISP-DM modellen til at klargøre
+de rådata, som er modtaget fra JP til klyngeanalyser, klassifikationsmodeller 
+og vores neurale netværksmodel. Til at starte med er der lavet data selection, 
+dvs. udvalgt relevante data til churn-modellerne. Dette er gjort ved at indlæse
+de tre datasæt: behavior, cancellation og subscription. Næste trin er data 
+cleaning, dvs at rense disse datasæt. I projektet er der splittet og parset 
+subscription datasættet, fjernet dubletter i både subscription og cancellation,
+samt håndteret manglende værdier i datasættet. Det tredje der blev gjort er data
+integration, dvs at datasættet er  sammenkoblet ved at merge subscription, 
+cancellation (efter de har været renset) og de features, som er lavet ud fra 
+behaviour datasættet. Det fjerde trin er data transformation, hvor variabler er 
+omdannet. Her er der f.eks. beregnet subscription_length_days og andre 
+variabler. Dette er det CRISP-DM modellen kalder feature construction og data 
+transformation, hvilket bruges til at forbedre modellernes performance. Efter 
+det er der lavet feature engineering, som nævnt kort tidligere. Dvs. der er 
+skabt nye variabler, der skal bruges i modellerne til at forbedre deres 
+performance. Dette er bla.: 
 
-### Evaluering
-Vurdere om modellen/resultatet er korrekt og brugbart ift. forretningsmålet.
+- restricted_ratio
 
-### Implementering 
-Sætte løsningen i drift: rapport, dashboard, automatisering eller system
+- mobile_ratio
 
-## Dataklargørelse
+- unique_pages
 
-### Hente data fra Superstats og gør dem tidy
+- fast_churn
 
-### Hente data fra DMI og gør dem tidy
+- continued_after_campaign
 
-### Hente data fra nager.at og gør dem tidy
+Dette er nok et af de vigtigste trin, da der skabes variabler, som modellerne 
+senere skal lære af. Til sidst gemmes i det samlede datasæt som en RDS-fil, så 
+det kan bruges til næste trin i CRISP-DM modellen, nemlig: Modellering. 
 
-### Hente Bjarnes data og gør dem tidy
+### 4) Modellering
+I forhold til churn prædiktion anvendes der supervised learning gennem 
+klassifikationsmodeller, hvor der er brugt adfærdsvariable og historiske 
+kundedata, som skaber et værktøj til at estimere sandsynligheden for at kunderne
+opsiger (churner) deres abonnement. Her bruges der tre klassifikationsmodeller: 
+Logistisk regression, Random Forest, og XGBoosting.  Der laves to modeller for 
+hver af de tre klassifikations, en til at forudsige kunde churn under 
+kampagneperioden og en til at forudsige et hurtigt churn efter kampagneperioden.
+Så i alt laves der 6 klassifikationsmodeller. Der laves også en ROC-kurve for 
+hver model, for at se forholdet mellem true-positives (TP) og false-positives 
+(FP).  Modellerne bliver sammenlignet ved at anvende forskellige performance mål
+som AUC, accuracy, sensivitiy og specificity. Der laves også cross-validation 
+AUC for hver model hvor test-dataene anvendes for at se hvordan modellen klare
+sig på nye ukendte data. Derudover anvendes der også unsupervised leaning til 
+segmentering af JPs kunder. Her er der anvendt hierakisk agglomerativ 
+clustering, hvor kunderne er blevet grupperet ud fra deres indbyrdes ligheder. 
+Datasættet indeholder både numeriske og kategoriske variabler, derfor anvendes 
+der Gower distance som afstandsmål, da den er bedst egnet til mixed-data. 
+Dette anvendes i stedet for PCA, som anvender Euklidisk-distance. PCA er mest
+velegnet til kun numeriske data. Den samlede modellerings fase i CRISP-DM 
+understøtter dermed både prædiktiv churn-analyse og strategisk 
+kundesegmentering, hvilket bidrager til at styrke JP's beslutningsgrundlag for 
+retention-indsatser og optimering af kampagner.
 
-### RSQLight
+### 5) Evaluering 
+Den første klassifikationsmodel er en XGBoost‑model, der forudsiger kundens 
+churn‑risiko under kampagnen. Den anden er ligeledes en XGBoost‑model, som 
+forudsiger hurtig churn efter kampagneperioden, defineret som churn inden for 10
+dage efter kampagnens afslutning. Modellerne adresserer direkte 
+forretningsproblemet, da formålet er at estimere, hvor stor risikoen er for, at
+en kunde churner. Modellerne valideres primært ved hjælp af AUC, som måler 
+modellernes evne til at skelne mellem kunder, der churner og ikke churner. 
+Derudover anvendes nøgletal som accuracy, sensitivity og specificity til at 
+vurdere modellernes performance ved det optimal cut‑off‑niveau 
+(her bruges Youden’s J). Derudover gennemføres en klyngeanalyse for at 
+identificere, hvilke faktorer der kendetegner kunder med høj vs. lav 
+churn‑risiko. Klyngeanalysen evalueres både teknisk og forretningsmæssigt. 
+Teknisk vurderes klyngernes kvalitet ud fra deres intern kohærens og 
+adskillelse, mens den forretningsmæssige evaluering fokuserer på, om klyngerne 
+er lette at fortolke, og om de giver brugbare segmenter, der kan afklare hvilke
+faktorer der adskiller om en kunde har høj eller lav risiko for at churne. 
 
-### Download joinet datasæt, formatér behørigt, og gør data klar til preprocessing
 
-### Preprocess - dan flere variabler og lav ét datasæt uden missing med en række for hver hjemmekamp, og fjern alle variabler, som ikke skal indgå i
+### 6) Implementering 
+Løsningen implementeres ved at integrere churn‑modellerne i virksomhedens 
+rapporteringsmiljø via Power BI. Modellerne genererer risikoscores for alle 
+kunder, og disse præsenteres i et Power BI‑dashboard, der indeholder en 
+prioriteret liste over kunder med høj churn‑risiko. Kundeservice kan anvende 
+listen til proaktiv kontakt, mens marketing kan målrette retention‑tiltag mod 
+specifikke segmenter.Dashboardet indeholder desuden segmenter fra 
+klyngeanalysen, så beslutningstagere kan forstå de vigtigste faktorer bag høj 
+risiko. Der skal også etableres en proces for monitorering af modellens
+performance samt.
 
-## Modellering - herunder opdeling i et trænings- og testdatasæt - med et seed = jeres holdnummer.
 
-### Stor model - linenær regression med alle variabler
+## Bilag – Juridisk analyse
+Afsnit 1: Retskilder og lovgivningsramme
+JP’s behandling af personoplysninger og data reguleres primært af Europa-Parlamentets og Rådets forordning (EU 2016/679) om beskyttelse af fysiske personer i forbindelse med behandling af personoplysninger, GDPR. EU forordningen har direkte virkning i dansk ret uden behov for national gennemførelse og suppleres af den danske databeskyttelseslov (LBK 289 af 25, marts 2024) som udfylder og præciserer det nationale råderum
+Markedsføringsloven (LBK 426 af 3 maj 2017 med ændringer i mellemtiden) regulerer JP’s retention kommunikation over for abonnenter og særligt §10 omhandlende elektronisk markedsføring.
+AI forordningen (AI Act, EU forordning 2024/1689) som er vedtaget af EU parlamentet og rådet, trådte i kraft d. 1/8-2024, men træder i kraft med trinvis implementering frem til august 2026 og finder anvendelse på JP’s brug af ML modeller.
+NIS2 direktivet (EU 2022/2555) er relevant i forbindelse med JP behandlingssikkerhed som udbyder af digitale tjenester.
+Efter EU rettens forrangsprincip finder EU retlige retskilder anvendelse før nationale retsregler i tilfælde af konflikt (Costa mod ENEL 1964)
+ 
+Afsnit 2: Er JP’s data personoplysninger?
+Faktum: Datasættet indeholder variable som pseudo_id, fødselsdato, køn og detaljerede adfærdsdata, hvilket indeholder sidevisninger, scrolldybde, devicetype og trafikkilde for over 1200 abonnenter
+Jus: en personoplysning er enhver oplysning om en identificerbar fysisk person jf. GDPR art. 4 nr. 1. Pseudonymisering mindsker risiko for direkte identifikation, men ophæver ikke GDPR anvendelsesområdet, jf. betragtning 26 & EDPB’s guidelines om pseudonymisering. Det er dog tilstrækkeligt at reidentifikation er mulig med rimelige midler. Det som er afgørende er at JP selv besidder nøglen til sammenkoblingen af pseudo_id, som betyder at data på JP’s side ikke kan anses for at være anonymiseret.
+Konklusion: Reidentifikation bliver mulig ved kombinationen af personoplysninger som fødselsdato, køn & adfærdsdata, og JP besidder muligheden for sammenkobling. GDPR og databeskyttelsesloven finder derfor fuld anvendelse på behandling af disse oplysninger.
+ 
+ 
+Afsnit 3: Grundlæggende principper (GDPR art. 5)
+GDPR art. 5. opstiller 7 grundlæggende principper. Overtrædelse af en af disse udgør i sig selv en overtrædelse af forordningen. I principperne nedenfor undersøges det hvilke principper som er særligt relevante for JP’s churn analyse
+Lovlighed, rimelighed og gennemsigtighed (litra a): JP skal have lovligt behandlingsgrundlag, behandlingen skal være rimelig, og abonnenter skal informeres om profilering på tidspunktet for dataindsamling jf. art 13 & 14. manglende opdatering af privatlivspolitik udgør altså en selvstændig overtrædelse af GDPR.
+Formålsbegrænsning (litra b): Data indsamlet til abonnements administration kan ikke bare uden videre benyttes til churn profilering. Et nyt formål kræver sin egen hjemmel, medmindre formålet hænger sammen med og er foreneligt med det oprindelige formål jf. forenelighedstesten art. 6. stk. 4. Adfærdsprofilering til retention formålet er ikke direkte foreneligt med abonnements administration.
+Dataminimering (litra c): JP må kun behandle de variable, som er nødvendige for at opfylde churn modellens formål. VIF test, PCA og klyngeanalyse kan identificere korrelerede og overflødige variable og fungere som den tekniske dokumentation for overholdelsen af dataminimeringsprincippet, som er den direkte kobling mellem dataanalyse og juridisk compliance.
+Rigtighed (litra d): Fødselsdatoerne er rapporteret af kunderne selv, og ikke verificerede og da alder indgår som feature i modellerne, kan ukorrekte data påvirke churn scoren. JP bør derfor have procedurer for berigtigelse jf. art. 16.
+Opbevaringsbegrænsning (litra e): Rådata bør slettes eller anonymiseres når churn modellen er trænet og valideret. JP bør derfor have fastsat konkrete frister for opbevaring af persondata som en del af deres governance indsats.
+Integritet og fortrolighed (litra f): Pseudonymisering ved hjælp af variablen pseudo_id er et tiltag der kan ses som udtryk for privacy by design jf. art. 25. Adgang til at tilgå og behandle persondata som ikke er pseudonymiseret bør dog begrænses og logges for at sikre, at det udelukkende kan tilgås af medarbejdere som er autoriserede.
+Ansvarlighed (stk. 2): JP skal aktivt dokumentere overholdelse af behandlingsaktiviteter med en fortegnelse over disse jf. art. 30 og bør overveje det konkrete behov for en DPIA (Data Protection Impact Assessment) ved omfattende profilering jf. art. 35
+ 
+ 
+ 
+Afsnit 4: Behandlingsgrundlag og interesseafvejning (GDPR art. 6)
+Faktum: JP ønsker at benytte adfærdsdata til at træne churn prædiktions modeller og målrette deres retention indsats overfor abonnenter.
+Jus: Administrationen af abonnementer kan behandles på grundlag af kontraktopfyldelse jf. litra b. Churn profilering er et nyt formål som kræver sin egen selvstændige hjemmel. Legitim interesse litra f. kræver en tredelt test; interessen skal være legitim, behandlingen nødvendig og inden for proportionerne og den registreredes grundlæggende rettigheder må ikke overstige den dataansvarliges interesse.
+Konklusion: JP’s interesse i fastholdelse af abonnenter er konkret og saglig. Modellen er et virkemiddel som er proportionelt og en grovere demografisk segmenteringsmodel ville forstyrre en større kundegruppe samt give dårligere præcision. Abonnenter kan dog ikke med rimelighed forvente at adfærdsdata som scrolldybde og devicetype benyttes til individuel profilering som er et modsigende element i den samlede vurdering.
+Den legitime interesse kan sagtens udgøre det lovlige grundlag, men kræver en LIA (Legitimate Interests Assessment), en opdateret privatlivspolitik samt en reel og konkret indsigelsesmulighed jf. art 21.
+Markedsføringssamtykke variablerne (permission_given_order og permission_given_today) er samtykke til elektronisk markedsføring jf. markedsføringsloven § 10 og er ikke identisk med GDPR behandlingsgrundlaget. Disse to regelsæt holdes adskilt.
+Afsnit 5: Automatiseret beslutningstagning (GDPR art. 22)
+Faktum: modellerne generer en score med sandsynlighed på abonnentbasis, der benyttes til beslutningsstøtte hos den ansvarlige afdeling i JP.
+Jus: Art. 22, stk. 1. forbyder afgørelser som træffes udelukkende på baggrund af automatisk behandling og som har retsvirkning eller tilsvarende indvirkning på den registrerede. EDPB guideline 05/2022 præciserer, at efterfølgende validering uden reel prøvelse ikke bryder kravet.
+Konklusion: JP’s medarbejdere skal foretage en substantiel vurdering forud for retention beslutningen, så længe dette overholdes, finder art. 22. Ikke anvendelse. Såfremt tildelingen af fastholdelsestilbud bliver automatiseret på baggrund af modellens output, bliver art. 22. aktiveret, og JP skal herefter sikre ret til menneskelig indgriben, indsigt i logikken bag beslutningen og mulighed for at bestride denne afgørelse jf. art. 22. stk. 3
+ 
+ 
+ 
+Afsnit 6: AI-forordningen (AI Act) — risikoklassificering og krav
+Faktum: JP anvender logistisk regression, Random Forest & XGBoost til klassificering af abonnenter efter sandsynlighed for churn. Outputtet bruges som beslutningsstøtte internt som led i retention indsatsen.
+Jus: AI act består af fire risikoniveauer:
+1.  	Uacceptabel risiko: Forbudt.
+2.  	Høj risiko: vurdering af overensstemmelse påkrævet.
+3.  	Begrænset risiko: krav om transparens.
+4.  	Minimal risiko: adfærdskodeks
+ML modeller som generer forudsigelser eller klassificeringer udgør AI systemer jf. AI Act. art. 3. nr. 1.
+Konklusion: JP’s churn modeller er ikke forbudt AI grundet der ingen social scoring jf. art. 5. er og falder ikke under bilag III kategorierne for høj risiko AI. Modellerne klassificeres som begrænset risiko niveau 3 jf. art. 50. Størstedelen af AI Act’s forpligtelser finder først fuld anvendelse fra august 2026, dog er kravene om transparens allerede relevante i det abonnenter skal informeres om profilering og JP bør derfor dokumentere formålet med modellerne samt datagrundlaget.
+Afsnit 7: Bias, diskrimination og ligebehandling
+Faktum: Alder og køn indgår som forklarende variable i modellerne og har derfor indvirkning på prioritering af retention indsatsen.
+Jus: det er dokumenteret af Institut for menneskerettigheder, at profilerings modeller kan skabe systematisk diskrimination indirekte, på baggrund af beskyttede karakteristika. Ligebehandlingsprincipperne forbyder direkte samt indirekte diskrimination på baggrund af persondata som alder og køn. AI Act. Art. 9 kræver at risiko for bias identificeres og modvirkes.
+Konklusion: JP bør evaluere modellernes specificitet og sensitivitet på tværs af demografiske grupper. såfremt der identificeres systematisk skæv behandling, bør relevante variable rekonstrueres eller udelades helt. Dette er et tiltag som styrker overholdelse af dataminimeringsprincippet i art. 5, stk. 1, litra c.
+ 
+Afsnit 8: Cybersikkerhed og behandlingssikkerhed
+Faktum: JP behandler adfærdsdata, persondata som køn og fødselsdato samt abonnement historik for over 1200 abonnenter i deres digitale systemer. Sikkerhedsbrud vil potentielt gøre reidentifikation mulig af samtlige registrerede.
+Jus: GDPR art. 32. kræver passende organisatoriske og tekniske foranstaltninger, som er proportionelle med behandlingens risikoprofil. NIS2 direktivet påkræver vigtige enheder at have risikostyrings foranstaltninger og indledende underretningspligt indenfor 24 timer ved væsentlige hændelser. JP kan som stor digital medieudbyder falde indenfor NIS2 anvendelsesområde.
+Konklusion: Pseudonymisering er ikke tilstrækkeligt som den eneste sikkerhedsforanstaltning. JP bør derfor supplere med kryptering i hvile og under transmission, rolle og autorisations baseret adgangsstyring med logning samt dokumenterede procedurer for sikkerhedsbrud, herunder blandt andet underretning til Datatilsynet indenfor 72 timer jf. art. 33. og til de registrerede jf. art. 34. ISO/IEC 27001 certificering anbefales som dokumentationen for et systematisk information sikkerheds styringssystem.
+ 
+Afsnit 9: Markedsføringsloven og registreredes rettigheder
+Markedsføringsloven § 10 kræver at der er indhentet forudgående samtykke til elektronisk markedsføring, medmindre kommunikationen omhandler lignende produkter til allerede eksisterende kunder (soft opt in). JP’s retention kommunikation vil normalt hente hjemmel her, på forudsætning af at der tilbydes en klar og tydelig frameldingsmulighed.
+Såfremt en abonnent trækker sit samtykke tilbage, skal JP omgående ophøre med direkte markedsføring, dog kan behandling til øvrige formål fortsætte under selvstændigt hjemmelsgrundlag Databeskyttelsesloven §13, stk. 1. forbyder videregivelse af forbrugeroplysninger til tredjeparter til markedsføringsbrug uden udtrykkeligt samtykke.
+JP bør implementere tilgængelige procedurer for udøvelse af de registreredes rettigheder:
+-          Indsigt art. 15.
+-          Berigtigelse art. 16
+-          Sletning art. 17
+-          Indsigelse mod behandling baseret på legitim interesse art. 21. som er særligt relevant i forbindelse med churn profilering
+ 
+## Jura kildeliste
+GDPR — Databeskyttelsesforordningen Indsættes ved: art. 4 nr. 1, art. 5, art. 6, art. 13, art. 14, art. 16, art. 21, art. 22, art. 25, art. 30, art. 32, art. 33, art. 34, art. 35, betragtning 26 https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=DA
+AI-forordningen (AI Act) Indsættes ved: art. 3 nr. 1, art. 5, art. 9, art. 50, bilag III https://eur-lex.europa.eu/legal-content/DA/TXT/?uri=CELEX:32024R1689
+NIS2-direktivet Indsættes ved: alle nævnelser af NIS2, 24-timers underretningspligten https://eur-lex.europa.eu/legal-content/DA/TXT/?uri=CELEX:32022L2555
+Databeskyttelsesloven — LBK nr. 289 af 8. marts 2024 Indsættes ved: alle nævnelser af databeskyttelsesloven, § 13 stk. 1 https://www.retsinformation.dk/eli/lta/2024/289
+Markedsføringsloven — LBK nr. 1420 af 2. december 2024 Indsættes ved: alle nævnelser af markedsføringsloven, § 10 https://www.retsinformation.dk/eli/lta/2024/1420
+Sag 6/64, Costa mod ENEL — EU-Domstolen, 15. juli 1964 Indsættes ved: forrangsprincippet i Bilag 1 https://eur-lex.europa.eu/legal-content/DA/TXT/?uri=CELEX:61964CJ0006
+WP251rev.01 — Retningslinjer om automatiserede afgørelser og profilering Indsættes ved: Bilag 5, der hvor du skriver "EDPB guideline 05/2022" — ret formuleringen til WP251rev.01 https://ec.europa.eu/newsroom/article29/items/612053
+EDPB Guidelines 01/2025 om pseudonymisering Indsættes ved: Bilag 2, "EDPB's guidelines om pseudonymisering" https://www.edpb.europa.eu/our-work-tools/documents/public-consultations/2025/guidelines-012025-pseudonymisation_en
+ISO/IEC 27001:2022 — Informationssikkerhedsstyringssystemer Indsættes ved: Bilag 8 og hoveddelen, "ISO/IEC 27001 certificering" https://www.iso.org/standard/27001
+Anthropic (2026). Claude Sonnet 4.6 [Large Language Model]. Tilgået april 2026 via https://claude.ai 
 
-### Lasso / Ridge - husk at bruge CV til at optimere lambda
 
-### Subset selection metoder (brug mindst én)
 
-### Sammenlign på validation de forskellige MSE fra hver model
-
-## Evaluering
-
-### Hvordan er Test-MSE sammenlignet med CV-MSE
-
-### Fortokning
-
-### Prædiktion på nye data (fx best-case/worst-case scenario for de første kampe i foråret)
-
-### Sammenlign resultatet med formålet med undersøgelsen.
-
-## Eksempler på markdown-sproget
-
-### Her hentes et billede 
-
-![Faserne i CRISP-DM.](crisp-dm.png){#fig-crispdm width="40%"}
-
-Her er et eksempel på anvendelse af en png fil, som skal ligge i dit
-working directory. Tekst mellem [] er figurteksten, som du øsnker i
-din opgave. Tekst mellem () er (placering og) navn på figuren. Tekst
-mellem {} er et henvisningsnavn, som du kan bruge til at henvise til
-figuren i din tekst. 
 
 ### Referencer 
 Her er et eksempel på en figur, som jeg henviser til [@fig-bnp_pr_capita] . 
@@ -2509,51 +2632,4 @@ global_economy |>
 ```
 <!-- "fig-bnp_pr_capita" er unikke navn til at lave reference med -->
 <!-- "Australsk BNP pr capita" er tekst til figuren -->
-
-
-```{r}
-#| label: tbl-sammenfat
-#| message: false
-#| warning: false
-#| echo: false
-#| tbl-cap: Outliers og indflydelsesrige observationer.
-
-sammenfat <- data.frame(
-  "observation" = c("16", "17", "39", "117"),
-  "outlier" = c("Ja", "Ja", "Nej", "Nej"),
-  "hoj_leverage" = c("Nej", "Nej", "Ja", "Ja"),
-  indflydelsesrig = c("Nej", "Nej", "Nej", "Ja"),
-  reference = c(
-    "Residuals vs Fitted, Q-Q Plot, Scale-Location, Boxplot",
-    "Residuals vs Fitted, Q-Q Plot, Scale-Location",
-    "Residuals vs Leverage",
-    "Residuals vs Leverage (Cook's Distance)"
-  )
-)
-
-colnames(sammenfat) <- c("Observation", "Outlier", "Høj leverage", "Indflydelsesrig observation", "Reference til plot")
-
-knitr::kable(sammenfat)
-
-```
-<!-- "tbl-sammenfat" er unikke navn til at lave reference med -->
-<!-- "Australsk BNP pr capita" er tekst til tabellen -->
-
-
-## Fed og kursiv, og punktform
-
--   **Daniel** Daniel skreved med fed skrift
-    -   *Olga* Olga skrevet i kursiv
-        - ***Palle*** Palle skrevet med fed skrift og i kursiv
-
-"-" angiver punktform - bemærk de forskellige niveauer
-
-## Formler (m.m)
-
-### Gennemsnit
-
-Gennemsnittet af y: de obsaverede (faktiske) værdier.
-$$\bar{y} = \frac{1}{n}\sum_{i=1}^{n}y_i$$
-
-
 
