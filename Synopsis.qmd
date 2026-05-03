@@ -119,14 +119,9 @@ virksomheden står derfor overfor behovet for at forbedre kundeværdien og
 dermed reducere churn-rate. 
 
 
-### Afgrænsning
-
-
 \newpage
 
-## Juridisk Metode
-
-### JP og datajura 
+## Begrænsninger ift datajura og etik
 
 JP/Politikens hus indsamler og behandler adfærdsdata og abonnementsoplysninger 
 fra deres digitale platforme med henblik på blandt andet at udvikle churn 
@@ -231,7 +226,7 @@ lavpraktiske procedurer for udøvelse af de registrerede rettigheder; indsigt
 baseret på legitim interesse, som er særligt relevant for churn profilering jf.
 art. 21. Bilag, afsnit 9.
 
-### Samlede juridiske anbefalinger
+### Delkonklusion - Samlede juridiske anbefalinger til Jyllandsposten 
 På baggrund af ovenstående analyse, anbefales det, at JP iværksætter og sikrer 
 følgende tiltag:
 
@@ -260,6 +255,53 @@ dokumenterede procedurer i overensstemmelse med art. 32 & NIS2
 - Forberedelse af fuld AI Act compliance inden august 2026, hvor dokumentation 
 af modellernes formål, datagrundlag og transparensforpligtelser over for 
 abonnenter indgår.
+
+\newpage
+
+## Visualisering 
+
+### CRAP-principperne 
+I projektet har det været en prioritet at sikre en optimal visualisering af 
+resultaterne. Derfor er CRAP-principperne anvendt med henblik på at forbedre 
+klarhed, struktur og formidling i de visuelle fremstillinger.
+
+### C - Contrast
+I dashboardet anvendes CRAP-principperne gennem tydelige farveforskelle mellem 
+nøgleelementer. F.eks. fremhæves centrale KPI’er med markante farver, hvilket 
+skaber et klart visuelt hierarki og gør det lettere hurtigt at identificere 
+kritiske datapunkter. Der er også bevidst anvendt farver som orange og lyseblå,
+da disse generelt er lettere at adskille for farveblinde brugere, i modsætning 
+til klassiske kombinationer som rød og grøn, som ofte skaber 
+fortolkningsproblemer. (Tilføj kilde fra Simon)
+
+### R - Repetition
+Repetition er anvendt i dashboardet med det formål at skabe genkendelighed og 
+sammenhæng i visualiseringerne. I projektet har der været flere overvejelser 
+omkring valg af farver, hvor f.eks. orange er valgt som en gennemgående farve 
+til at repræsentere churn. Dette gør det mere intuitivt for brugeren at 
+identificere og få overblik over churn på tværs af de forskellige 
+visualiseringer. Repetition er effektivt, da det reducerer den kognitive 
+belastning og gør det lettere for brugeren at fortolke data ud fra de anvendte 
+farver. 
+
+### A - Alignment 
+I projektet er alignment anvendt for at sikre en struktureret og visuelt 
+balanceret opsætning af dashboardet. Grafer, KPI’er og labels er sat op 
+systematisk, hvilket bidrager til et professionelt udtryk og en optimal 
+læseretning. Der er derfor valgt ensartede placeringer af elementerne, og 
+f.eks. graferne er justeret efter år. Som nævnt tidligere anvendes der også 
+gentagelser i farvestrukturerne, hvilket understøtter et bedre overblik samt 
+evnen til at identificere mønstre og sammenligne data.
+
+### P - Proximity
+I forhold til proximity er princippet anvendt ved at gruppere relaterede 
+nøgletal og visualiseringer. Adfærdsdata og tilhørende KPI’er er placeret i de
+samme visuelle områder, hvilket er med til at signalere en naturlig sammenhæng 
+mellem dataen. Grupperingerne gør det lettere at forstå relationer i data og 
+understøtter en mere intuitiv fortolkning af resultaterne. Samtidig reduceres 
+risikoen for fejltolkning, da elementer, der ikke hører sammen, er blevet 
+adskilt.
+
 
 \newpage
 
@@ -467,11 +509,15 @@ Der er ingen særlig struktur i en MLP-NV-model, da alle input behandles ens.
 
 ## Klyngeanalyse til PowerBI visualisering. 
 
+### Nuværende datamodenhed
 Det kan vurderes, at en implementering af nye modeller med Power BI til 
 visualisering, som JP kan anvende, er en realistisk løsning på baggrund af 
 JP’s nuværende niveau af data modenhed. JP befinder sig med deres
 nuværende forretningsstruktur i fase 4 i forhold til Gartner’s 
-Data Governance Maturity Model. JP anvender i høj grad data som et brugbart 
+Data Governance Maturity Model. 
+
+### Hvorfor Power BI som værktøj?
+JP anvender i høj grad data som et brugbart 
 værktøj til at træffe datadrevne beslutninger i deres virksomhed, og de har 
 allerede medarbejdere, som primært arbejder med data. Den nye model bør derfor 
 implementeres i virksomheden og integreres med Power BI for at understøtte en 
@@ -859,7 +905,8 @@ cluster_profile <- model_data_clean %>%
     .groups = "drop"
   )
 ```
-Forklaring af klyngerne:
+
+### Delkonklusion - Fortolkning af klyngerne
 
 Klynge 1 – Moderat engagerede med forhøjet churn
 
@@ -939,7 +986,7 @@ risikable klynge ift hurtig churn.  Klynge 4 og klynge 3 er også ret stabile,
 men ikke helt på niveau med klynge 2. Klynge 1 er den mest churn‑risikable med 
 den højeste fast churn‑rate.
 
-### Visualisering
+### Delkonklusion - Visualisering af klyngerne
 
 MDS visualisering af klynger
 ```{r}
@@ -1682,6 +1729,7 @@ cv_sammenligning <- bind_rows(
 ```
 
 
+### Delkonklusion - Fortolking af klassifikationsmodel 1
 Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
 fortsætter efter kampagneperioden (churn eller ej). Vi har brugt korrekt 
 feature engineering og fjernet dataleakage, og lavet tre forskellige 
@@ -1691,7 +1739,10 @@ finder 75,0% af churnerne og 70,8% af de kunder der fortsætter. Random
 Forest har en AUC på 77,1% og finder 94,2% af churnerne, men kun 44,3% af 
 ikke-churnerne — en ubalance der gør den mindre egnet. Logistisk regression 
 er den svageste model med AUC på 66,9%. Vi har valgt XGBoost da den har den 
-bedste balance mellem sensitivitet og specificitet.
+bedste balance mellem sensitivitet og specificitet. Den mest betydningsfulde 
+variabel er account_active_days. Dette kan ses ved, at kunder uden historik har 
+markant højere churn‑risiko end mere loyale kunder. 
+
 
 ### Gem som CSV-filer til Power BI
 
@@ -2296,6 +2347,9 @@ cv_sammenligning2 <- bind_rows(
   select(Model, ROC, Sens, Spec)
 ```
 
+
+### Delkonklusion - Fortolkning af klassifikationsmodel 2 
+
 Vi har udviklet en klassifikationsmodel, der forudsiger, om en kunde 
 fortsætter efter kampagneperioden (churn eller ej). Vi har brugt korrekt 
 feature engineering og fjernet dataleakage, og lavet tre forskellige 
@@ -2303,9 +2357,9 @@ klassifikationsmodeller. XGBoost modellen opnår den højeste AUC på 82,8%
 og dermed den bedste balance mellem sensitivitet og specificitet, hvor den 
 finder 86% af churnerne og 66,7% af de kunder der fortsætter. Random 
 Forest har en AUC på 80,2% og finder 69,8% af churnerne, og 81% af 
-ikke-churnerne.  Logistisk regression 
-er den svageste model med AUC på 70.9%. Vi har valgt XGBoost da den har den
-højeste AUC og den bedste balance mellem sensitivitet og specificitet.
+ikke-churnerne.  Logistisk regression er den svageste model med AUC på 70.9%. 
+Vi har valgt XGBoost da den har den højeste AUC og den bedste balance mellem 
+sensitivitet og specificitet.
 
 
 
@@ -2348,10 +2402,91 @@ model_sammenligning2 %>%
 
 \newpage 
 
-## Væsentligste konklusioner
+## Konklusion
+Projektet har gennem tre machine learning‑problemstillinger adresseret 
+Jyllands-Postens centrale forretningsudfordring: at reducere churn under 
+kampagnen, identificere hurtig churn efter kampagnen og skabe et datadrevet g
+rundlag for differentierede retention‑indsatser. Arbejdet er gennemført efter
+CRISP-DM‑frameworket for at sikre en systematisk og reproducerbar analyseproces 
+fra forretningsforståelse til implementering.
+
+Der er lavet en klyngeanalyse, som segmenterer abonnentbasen i fire 
+tydelige kundetyper med forskellige risikoprofiler. Dette muliggør 
+differentierede retention‑strategier frem for en generel indsats.
+
+Der er også lavet to klassifikationsmodeller.
+
+Model 1 skulle forudsige churn under kampagnen. Det er fundet frem til, at en
+XGBoost-model er den mest præcise churn‑model. Dette konkluderes ud fra den 
+højeste AUC, og den bedst vurderet balance mellem sensitivity og en specificity.
+Den mest betydningsfulde variabel er account_active_days, hvilket indikerer, at 
+loyalitet primært opbygges gennem tid og engagement, og ikke gennem kampagnepris 
+alene. Nye kunder uden historik har markant højere churn‑risiko end mere loyale
+kunder. 
+
+Model 2 identificerer de abonnenter, der fortsætter efter kampagnen, men churner
+inden for de første 10 dage på listepris. Disse kunder reagerer typisk på den 
+første fulde betaling og repræsenterer en særlig form for tidlig churn, som
+kræver målrettet indsats. Det er også fundet frem til, at en
+XGBoost-model er den mest præcise churn‑model. Dette konkluderes ud fra den 
+højeste AUC, og den bedst vurderet balance mellem sensitivity og en specificity.
+
+Som et fremadrettet perspektiv er der udviklet en MLP‑neural netværksmodel, der
+med et større datasæt og længere tidsserier  potentielt kan øge 
+prædiktionspræcisionen yderligere. Men dette er et længerevarende projekt. 
+
+Resultaterne er formidlet i et Power BI‑dashboard designet efter 
+CRAP‑principperne for at sikre klar og intuitiv kommunikation til 
+ikke‑tekniske beslutningstagere.
+
+Juridisk vurderes JP’s behandling af abonnementsdata at kunne hjemles i 
+legitim interesse (GDPR art. 6, stk. 1, litra f), forudsat at JP gennemfører og
+dokumenterer en Legitimate Interest Assessment (LIA) og opdaterer 
+privatlivspolitikken med tydelig information om profilering.
 
 \newpage
 
+## Konkrete anbefalinger til Jyllandsposten 
+
+- Retention indsats baseret på churn score:
+JP bør anvende churn modellen til at identificere højrisiko abonnenter allerede
+i de første 14 dage af kampagneperioden. En proaktiv engagementsindsats som for
+eksempel et personaliseret nyhedsbrev eller en redaktionel anbefaling bør 
+iværksættes inden kampagnens afslutning frem for reaktivt efter opsigelsen.
+ 
+- Prioritér onboarding af nye kunder: 
+Da account_active_days er den vigtigste enkeltfaktor, bør JP investere særligt 
+i onboarding af kunder uden historik. Kunder der hurtigt etablerer et aktivt 
+engagement, konverterer markant bedre til langtidsabonnenter.
+
+- Differentier retention efter kundesegment: 
+Klyngeanalysen viser at en ensartet retention indsats er ineffektiv. JP bør 
+anvende segmentprofilen til at målrette kommunikation og tilbud. Højrisiko 
+segmentet bør mødes med prismæssige initiativer, mens loyale segmenter i højere 
+grad responderer på indholdsmæssig relevans.
+
+- Undgå automatisering uden menneskelig kontrol: 
+Churn modellen bør anvendes som beslutningsstøtte og ikke som automatisk 
+tildeling af fastholdelsestilbud, da dette aktiverer GDPR art. 22. Såfremt 
+tildelingen automatiseres direkte fra modellens input, aktiveres art. 22. og 
+JP skal sikre ret til menneskelig indgriben og mulighed for indsigelse mod
+modelbeslutninger.
+
+- Løbende evaluering af modeller for demografisk bias: 
+Da alder og køn indgår som forklarende variable, bør JP evaluere modellernes 
+sensitivity og specificity systematisk på tværs af de demografiske grupper. 
+Såfremt der identificeres systematisk skæv behandling, bør JP rekonstruere eller
+fjerne de relevante variable, hvilket samtidig vil styrke deres overholdelse af 
+dataminimeringsprincippet art. 5. stk. 1. litra c. og modvirke potentiel 
+indirekte diskrimination.
+
+- Forberedelse af juridisk compliance: 
+JP bør gennemføre og dokumentere en LIA, opdatere privatlivspolitikken med 
+oplysning om profilering og forberede fuld AI Act compliance inden august 2026, 
+hvor transparenskravene træder fuldt i kraft.
+
+
+\newpage
 ## Literaturliste
 
 ::: {#refs}
