@@ -2422,7 +2422,8 @@ from tensorflow.keras.optimizers import Adam
 
 Indlæs rds datafil i python vha. pyreader
 ```{python}
-df = pr.read_r('renset_datasæt.rds')
+result = pr.read_r('data/renset_datasæt.rds')
+df = result[None]   # .rds har ingen navngiven nøgle, så brug None
 ```
 
 Her defineres variablerne. I modellen anvendes target-variabel. I følgende model kigger vi på sandsynligheden for at en kunde churner efter kampagnen. Her er 1 = forsat, og 0 = ikke forsat
@@ -2447,16 +2448,16 @@ for col in df.columns:
     if col == target_col:
         continue
     # Datoer
-    if np.issubdtype(series.dtype, np.datetime64):
+    if pd.api.types.is_datetime64_any_dtype(series):
         date_cols.append(col)
     # Boolske (enten dtype bool eller 2 unikke værdier)
-    elif series.dtype == "bool" or series.nunique() == 2:
+    elif pd.api.types.is_bool_dtype(series) or series.nunique(dropna=True) == 2:
         bool_cols.append(col)
-    # Kategoriske
-    elif series.dtype == "object":
+    # Kategoriske (object/string)
+    elif pd.api.types.is_string_dtype(series) or pd.api.types.is_object_dtype(series):
         cat_cols.append(col)
     # Numeriske
-    elif np.issubdtype(series.dtype, np.number):
+    elif pd.api.types.is_numeric_dtype(series):
         quant_cols.append(col)
 ```
 
@@ -2469,7 +2470,7 @@ y = df[target_col].values
 ```
 ```{python}
 kontakt_dummies = pd.get_dummies(
-    df[cat_cols].astype(str), prefix=cat_cols, drop_first=False
+    df[cat_cols].astype(str), prefix=cat_cols, drop_first=False, dtype=float
 )
 ```
 ```{python}
