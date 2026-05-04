@@ -2364,7 +2364,7 @@ sensitivitet og specificitet.
 
 
 
-### em som CSV-filer til Power BI
+### Gem som CSV-filer til Power BI
 
 Eksport af resultater til Power BI.
 ```{r}
@@ -2399,6 +2399,160 @@ model_sammenligning2 %>%
 
 ## Modellering - Multi Layer Perceptron (MLP) model
 
+Her hentes der de relevante pakker
+```{r}
+pacman::p_load(reticulate)
+reticulate::py_install(c("tensorflow", "pandas", "numpy", "pyreadr", "scikit-learn"))
+```
+
+```{python}
+import pandas as pd
+import numpy as np
+import pyreadr as pr
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.models import Sequential
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, regularizers
+from tensorflow.keras import backend as K
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.optimizers import Adam
+```
+
+Indlæs rds datafil i python vha. pyreader
+```{python}
+df = pr.read_r('renset_datasæt.rds')
+```
+
+Her defineres variablerne. I modellen anvendes target-variabel. I følgende model kigger vi på sandsynligheden for at en kunde churner efter kampagnen. Her er 1 = forsat, og 0 = ikke forsat
+```{python}
+target_col = "continued_after_campaign"
+
+```
+Nu kategoriseres de resterende feauteres variabler. Her deles de op efter typen, da de forskellige typer for data behandles forskelligt.
+```{python}
+cat_cols = []
+bool_cols = []
+date_cols = []
+quant_cols = []
+```
+
+Nu laves der 
+```{python}
+for col in df.columns:
+    series = df[col]
+
+    # Target skal ikke kategoriseres
+    if col == target_col:
+        continue
+    # Datoer
+    if np.issubdtype(series.dtype, np.datetime64):
+        date_cols.append(col)
+    # Boolske (enten dtype bool eller 2 unikke værdier)
+    elif series.dtype == "bool" or series.nunique() == 2:
+        bool_cols.append(col)
+    # Kategoriske
+    elif series.dtype == "object":
+        cat_cols.append(col)
+    # Numeriske
+    elif np.issubdtype(series.dtype, np.number):
+        quant_cols.append(col)
+```
+
+Saml alle feature-kolonner (uden target)
+```{python}
+feature_cols = cat_cols + bool_cols + date_cols + quant_cols
+```
+```{python}
+y = df[target_col].values
+```
+```{python}
+kontakt_dummies = pd.get_dummies(
+    df[cat_cols].astype(str), prefix=cat_cols, drop_first=False
+)
+```
+```{python}
+dummy_cols = []
+```
+```{python}
+X_df = pd.concat([df[dummy_cols], kontakt_dummies, df[quant_cols]], axis=1)
+```
+```{python}
+X_train_df, X_test_df, y_train, y_test = train_test_split(
+    X_df, y, test_size=0.20, random_state=42, stratify=y
+)
+```
+```{python}
+scaler      = StandardScaler()
+X_train_arr = X_train_df.copy()
+X_test_arr  = X_test_df.copy()
+
+X_train_arr[quant_cols] = scaler.fit_transform(X_train_df[quant_cols])
+X_test_arr[quant_cols]  = scaler.transform(X_test_df[quant_cols])
+```
+```{python}
+X_train = X_train_arr.values.astype(np.float32)
+X_test  = X_test_arr.values.astype(np.float32)
+```
+
+```{python}
+print(f"X_train: {X_train.shape}  |  y_train: {y_train.shape}")
+print(f"X_test:  {X_test.shape}   |  y_test:  {y_test.shape}")
+```
+Nu laver vi MLP-modellen
+```{python}
+K.clear_session()
+
+```
+
+```{python}
+tf.random.set_seed(42)
+
+model_01 = keras.Sequential([
+    layers.Input(shape=(X_train.shape[1],)),    # Inputlag: 14 features
+    layers.Dense(64, activation="relu"),        # Skjult lag 1: 64 neuroner
+    layers.Dense(32, activation="relu"),        # Skjult lag 2: 32 neuroner
+    layers.Dense(1,  activation="sigmoid")      # Outputlag: sigmoid → P(y=1)
+], name="neural_net_klassifikation")
+```
+
+```{python}
+model_01.compile(
+    optimizer="adam",                           # Prøv evt. andre
+    loss="binary_crossentropy",                 # Tabsfunktion til binær klassifikation
+    metrics=["accuracy", tf.keras.metrics.AUC(name="auc"), tf.keras.metrics.Precision(), tf.keras.metrics.Recall()]
+)
+```
+
+
+```{python}
+model_01.summary()
+
+```
+
+```{python}
+history = model_01.fit(
+    X_train, y_train,
+    epochs=10,
+    batch_size=64,
+    validation_split=0.20,
+    verbose=1
+)
+```
+
+```{python}
+loss, acc, auc, precision, recall = model_01.evaluate(X_test, y_test, verbose=0)
+print(f"Test Loss: {loss:.4f} | Test Accuracy: {acc:.4f} | Test AUC: {auc:.4f} | Test Precision: {precision:.4f} | Test Recall: {recall:.4f}")
+```
+
+### Delkonklusion
+
+Det kan ses, at accuracy er under 50% ved den neurale netværks model. Dette
+betyder, at fildældig gæt vil være bedre en bedre prædiktion. Modellen vurderes
+derfor uegnet til JP's problemstilling. Dette var dog også forventet, da en 
+neural netværks model kræver et meget stort datasæt, da den er i stand til at 
+fange meget komplekse mønstre, som simplere klassifikationsmodeller ikke kan. 
 
 \newpage 
 
