@@ -2423,7 +2423,23 @@ from tensorflow.keras.optimizers import Adam
 Indlæs rds datafil i python vha. pyreader
 ```{python}
 result = pr.read_r('data/renset_datasæt.rds')
-df = result[None]   # .rds har ingen navngiven nøgle, så brug None
+df = result[None]
+
+# Fjern ID, leakage og overflødige kolonner — samme logik som i R-modellerne
+drop_cols = [
+    "pseudo_id",                                        # unik ID
+    "subscription_cancel_date", "end_date", "expiration_date",
+    "newsletters_after_order",                          # post-kampagne info
+    "fast_churn", "fast_churn_converted", "churn_10",   # andre targets
+    "subscription_length_days", "length_group",         # afslører varighed
+    "type", "reason",                                   # kun udfyldt for churnede
+    "first_campaign_day", "last_campaign_day",
+    "account_active_days",                              # leakage (post-event)
+    "order_trackertag",                                 # høj-kardinalitet støj
+    "permission_given_today", "age",
+    "order_date", "usr_created", "birthdate"            # rå datoer
+]
+df = df.drop(columns=[c for c in drop_cols if c in df.columns]).dropna()
 ```
 
 Her defineres variablerne. I modellen anvendes target-variabel. I følgende model kigger vi på sandsynligheden for at en kunde churner efter kampagnen. Her er 1 = forsat, og 0 = ikke forsat
